@@ -1,9 +1,21 @@
-import math
-from config import gameConfig # TODO: this should go away
-from geometry import Point, Vector, Rect, distancePP
-from physics import Body, Universe
-from util import randomFloat, randomPointRect, log
+"""Game mechanics"""
+
+import numpy as np
 import time
+import random
+from config import Config
+from geometry import Point, Rect
+from physics import Body, Universe, Trajectory, SurfaceOrbit
+from util import randomFloat, randomPointRect, log
+
+
+class PlanetType:
+    def __init__(self, name, radius, density, count):
+        self.name = name
+        self.radius = radius
+        self.density = density
+        self.count = count
+
 
 class Planet(Body):
     """ Planet - a body where space ships can land.
@@ -14,73 +26,152 @@ class Planet(Body):
                   RGB-component to be filled dynamically.
     """
     
-    def __init__(self, type, pos):
-        if type == 'normal':
-            radius = gameConfig.planetSizeNormal()
-            density = gameConfig.planetDensityNormal()
-        elif type == 'small':
-            radius = gameConfig.planetSizeSmall()
-            density = gameConfig.planetDensitySmall()
-        elif type == 'large':
-            radius = gameConfig.planetSizeLarge()
-            density = gameConfig.planetDensityLarge()
-        else:
-            raise ValueError('Illegal planet type')
-            
+    def __init__(self, pos, pType, rotation):
         Body.__init__(self, 
-                      type,
+                      type=pType.name,
                       pos=pos.copy(), 
-                      radius=radius, 
-                      rotation=gameConfig.rotationRange.random(), 
-                      density=density)
-        self.ship = None
+                      radius=pType.radius, 
+                      rotation=rotation, 
+                      density=pType.density)
+        self.type = pType
+        
+    def update(self, t): pass
+
+    def __str__(self):
+        return 'Planet(type={type}, pos=({x},{y}), rot={rot})'.format(
+                type=self.type.name,
+                x=self.pos.x,
+                y=self.pos.y,
+                rot=self.rotation)
+        
+    def logState(self, t):
+        log('log', str(self))
         
     
 class Ship:
-    """Our space ship"""
-    def __init__(self, body, angle):
-        self.body = body
-        self.angle = angle
+    """Our space ship - yay!"""
+    def __init__(self, body, angle, universe):
+        self.universe = universe
         self.usedFuel = 0
-        self.vec = Vector(0,0) # current motion vector
-        self.nLaunches = 0   # how many landings on a planet
-        self.nLost = 0       # how often flown outside of universe rectangle
+        self.nLaunches = 0     # how many landings on a planet
+        self.nLost = 0         # how often flown outside of universe rectangle
+        self.paths = [body.orbit(0, angle)]
 
+    @property
+    def planet(self):
+        if type(self.paths[-1]) is SurfaceOrbit:
+            return self.paths[-1].body
+        return None
 
     def speed(self):
-        return math.sqrt(self.vec[0]**2 + self.vec[1]**2)
+        # TODO
+        pass
     
-    def land(self, body, angle):
-        self.body = body
-        self.angle = angle
+    def land(self, t, planet, yAngle):
+        orbit = planet.orbit(t, yAngle)
+        self.paths.append(orbit)
+        log('Ship', 'Landed on {}\nTime {}\nyAngle {}'.format(planet, t, yAngle))
+        log('Ship', 'Orbit yAngle {}'.format(orbit.yAngleAt(t)))
         
-    def launch(self, vec):
-        self.vec.x = vec.x
-        self.vec.y = vec.y
-        speed = vec.norm()
-        self.usedFuel += speed
+    def launch(self, thrust, t):
+        orbit = self.paths[-1]
+        if type(orbit) is not SurfaceOrbit:
+            log('Ship', 'Can not launch. Not in orbit')
+            return
+        
+        pos, velocity = orbit.posVelocity(t)
+        orbit.endTime = t
+        
+        v = orbit.body.pos.vector(pos)
+        v.scaleTo(thrust)
+        v += velocity
+        
+        traj = Trajectory(t, pos, v, 
+                          self.universe, 
+                          onHit=self.onHitBody, 
+                          onOutOfRect=self.onOutOfUniverse)
+        self.paths.append(traj)
         self.nLaunches += 1
+        log('Ship', 'Launched at {}\nVelocity: {}\nStart orbit: {}'.format(t, v, orbit.body))
         
+    def onHitBody(self, t, body, yAngle):
+        self.land(t, body, yAngle)
+    
+    def onOutOfUniverse(self, t, pos):
+        self.nLost += 1
+        self.paths.pop()
+        log('Ship', 'Moved out of visible universe at time {}'.format(t))
         
+    def positionAt(self, t):
+        # Fast path
+        path = self.paths[-1]
+        pos = path.positionAt(t)
+        if pos is not None:
+            return pos
         
+        # So we are looking for a position in the past...
+        for path in self.paths:
+            if path.startTime <= t <= path.endTime:
+                pos = path.positionAt(t)
+                assert pos is not None
+                return pos
+            
+        raise Exception('Failed to get ship position at time %s' % t)
+        
+    def update(self, t):
+        path = self.paths[-1]
+        if type(path) is Trajectory:
+            path.update(t)
+            
+    def logState(self, t):
+        log('log', str(self))
+        
+    def __str__(self):
+        return 'Ship(fuel={fuel}, launches={launches}, lost={lost}, mov={mov})'.format(
+                fuel=self.usedFuel,
+                launches=self.nLaunches,
+                lost=self.nLost,
+                mov=str(self.paths[-1]))
+        
+ 
 
 class Game:
     """Main class for the game"""
 
-    def __init__(self, config):
-        self.cfg = config
+    def __init__(self, settings):
+        self.settings = settings
+        self.universe = None
+        self.startPlanet = None
+        self.targetPlanet = None
+        self.ship = None
+        self.startTime = 0
+        self.endTime = np.Inf
+        self.lastUpdate = 0
+        self.planetTypes = {
+                'normal': PlanetType('normal', 
+                                     radius=settings.planetRadiusNormal,
+                                     density=settings.planetDensityNormal,
+                                     count=settings.nNormalPlanets),
+                'small': PlanetType('small',
+                                    radius=settings.planetRadiusSmall,
+                                    density=settings.planetDensitySmall,
+                                    count=settings.nSmallPlanets),
+                'large': PlanetType('large',
+                                    radius=settings.planetRadiusLarge,
+                                    density=settings.planetDensityLarge,
+                                    count=settings.nLargePlanets)
+        }
 
     def build(self):
         log('Game', 'Building new game')
-        cfg = self.cfg
-        pg = PlanetGenerator(cfg)
+        log('Game', 'Creating planets')
+        pg = PlanetGenerator(self.planetTypes, self.settings)
         pg.run()
-        self.universe = Universe(pg.planets)
+        self.universe = Universe(pg.planets, Config.uniRect, self.settings.gravityConstant)
         self.startPlanet = pg.startPlanet
         self.targetPlanet = pg.targetPlanet
-        self.ship = Ship(self.startPlanet, 0)
-        self.nLaunches = 0
-        self.startTime = 0
+        log('Game', 'Creating ship')
+        self.ship = Ship(self.startPlanet, 0, self.universe)
         
     def start(self):
         """Start a new game
@@ -90,17 +181,21 @@ class Game:
         # List of trajectories of the ship
         self.trajectories = []
         self.startTime = time.perf_counter()
-
-    def gameTime(self):
-        t = time.perf_counter()
-        return (t - self.startTime)
     
-    def launchShip(self, thrust):
-        self.usedThrust += thrust
-        pass
-
-
-
+    def launchShip(self, gt, thrust):
+        self.ship.launch(thrust, gt)
+    
+    def update(self, gt):
+        self.ship.update(gt)
+        # for body in self.universe.bodies:
+        #    body.update(t)
+        self.lastUpdate = gt
+            
+    def logState(self, t):
+        #for planet in self.universe.bodies:
+        #    planet.logState(t)
+        self.ship.logState(t)
+            
 
 
 class PlanetGenerator:
@@ -129,34 +224,40 @@ class PlanetGenerator:
          +-----+-------------------------------------+-----+
     """
     
-    def __init__(self, config):
-        self.cfg = config
-        self.uniRect = config.uniRect
-        self.wStartArea = config.startAreaWidth
-        self.wTargetArea = config.targetAreaWidth
-        self.relDistance = config.minPlanetDistance
-        rect = self.uniRect
-        self.planetRect = Rect(rect.xmin + self.wStartArea,
-                               rect.ymin,
-                               rect.xmax - self.wTargetArea,
-                               rect.ymax)
+    def __init__(self, planetTypes, settings):
+        self.pTypes = planetTypes
+        self.settings = settings
+        self.uniRect = Config.uniRect
+        self.wStartArea = Config.startAreaWidth
+        self.wTargetArea = Config.targetAreaWidth
+        self.spread = settings.planetSpread
+        r = self.uniRect
+        self.planetRect = Rect(r.xmin + self.wStartArea,
+                               r.ymin,
+                               r.xmax - self.wTargetArea,
+                               r.ymax)
         self.planets = None
         self.startPlanet = None
         self.targetPlanet = None
+        
+    def randomPlanetRotation(self):
+        aSpeed = self.settings.planetRotation
+        aSpeed *= random.uniform(0.5, 1.5)
+        aSpeed *= random.choice((-1, 1))
+        return aSpeed
         
     def run(self):
         log('PlanetGenerator', 'Creating planets')
         self.createStartAndTarget()
         
-        cfg = self.cfg
         for tries in range(5):
             self.planets = [self.startPlanet, self.targetPlanet]
-            
-            if not self.addPlanets('large', cfg.planetSize*1.5, cfg.nLargeP):
+            # Better to try larger planets first
+            if not self.addPlanets(self.pTypes['large']):
                 continue
-            if not self.addPlanets('normal', cfg.planetSize, cfg.nNormalP):
+            if not self.addPlanets(self.pTypes['normal']):
                 continue
-            if self.addPlanets('small', cfg.planetSize*0.66, cfg.nSmallP):
+            if self.addPlanets(self.pTypes['small']):
                 return
         raise Exception("Failed to create planets")
         
@@ -167,13 +268,18 @@ class PlanetGenerator:
         pos = Point(self.uniRect.xmin + self.wStartArea/2,
                     randomFloat(ur.ymin + ur.height()*0.2, 
                                 ur.ymax - ur.height()*0.2))
-        self.startPlanet = Planet('normal', pos)
+        self.startPlanet = Planet(pos, 
+                                  self.pTypes['normal'],
+                                  self.randomPlanetRotation())
     
         # make sure the start planet is not right at the top or bottom 
         pos = Point(ur.xmax - self.wTargetArea/2,
                     randomFloat(ur.ymin + ur.height()*0.2, 
                                 ur.ymax - ur.height()*0.2))
-        self.targetPlanet = Planet('normal', pos)
+
+        self.targetPlanet = Planet(pos, 
+                                   self.pTypes['normal'], 
+                                   self.randomPlanetRotation())
         
     # Helper function to find a random position for a planet
     def findPosition(self, rect, pRadius):
@@ -181,7 +287,7 @@ class PlanetGenerator:
             pos = randomPointRect(rect)
             success = True
             for p in self.planets:
-                if distancePP(pos, p.pos) < (pRadius + p.radius)*self.relDistance:
+                if pos.distance(p.pos) < (pRadius + p.radius)*self.spread:
                     success = False
                     break
             if success:
@@ -190,16 +296,19 @@ class PlanetGenerator:
         return None # failed to find a position
     
     # Helper function to add planets of a given type
-    def addPlanets(self, type, radius, num):
+    def addPlanets(self, pt):
+        log('PlanetGennerator', 'Createing {n} {s} planets (radius: {r})'.format(
+                n=pt.count, s=pt.name, r=pt.radius))
         pr = self.planetRect
-        dr = radius*self.relDistance
+        dr = pt.radius*self.spread
         rect = Rect(pr.xmin + dr, pr.ymin + dr,
                     pr.xmax - dr, pr.ymax - dr)
-        for n in range(num):
-            pos = self.findPosition(rect, radius)
+        for n in range(pt.count):
+            pos = self.findPosition(rect, pt.radius)
             if pos is not None:
-                self.planets.append(Planet(type, pos))
-                log('PlanetGenerator', 'Created {} planet at ({}, {})'.format(type, pos.x, pos.y))
+                p = Planet(pos, pt, self.randomPlanetRotation())
+                self.planets.append(p)
+                log('PlanetGenerator', 'Created {} planet at ({}, {})'.format(pt.name, pos.x, pos.y))
             else:
                 return False
         return True

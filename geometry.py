@@ -1,8 +1,7 @@
-"""Collection of useful geometric function"""
+"""Collection of useful geometry classes and functions"""
 
-# Helpers for geometrical stuff
 
-from math import sqrt, sin, cos, acos, asin, pi
+import numpy as np
 
 
 class Point:
@@ -12,14 +11,50 @@ class Point:
         self.x = x
         self.y = y
 
-    def __add__(self, v):
-        return Point(self.x + v.x, self.y + v.y)
+    def __add__(self, p):
+        return Point(self.x + p.x, self.y + p.y)
+    
+    def __sub__(self, p):
+        return Point(self.x - p.x, self.y - p.y)
+    
+    def __mul__(self, k):
+        return Point(self.x*k, self.y*k)
+    
+    def __eq__(self, p):
+        return self.x == p.x and self.y == p.y
+    
+    def __hash__(self):
+        return hash(self.x, self.y) 
 
+    def distance(self, p):
+        """Return euclidian distance to point p"""
+        return np.hypot(p.x - self.x, p.y - self.y)
+    
+    def vector(self, p):
+        """Return a vector from Point p1 to Point p2"""
+        return Vector(p.x - self.x, p.y - self.y)
+    
+    def rect(self, p):
+        """Return a rectangle with diagonally opposite Points p1 and p2"""
+        if self.x < p.x:
+            x1 = self.x
+            x2 = p.x
+        else:
+            x1 = p.x
+            x2 = self.x
+        if self.y < p.y:
+            y1 = self.y
+            y2 = p.y
+        else:
+            y1 = p.y
+            y2 = self.y
+        return Rect(x1, y1, x2, y2)
+    
     def copy(self):
         return Point(self.x, self.y)
     
     def __str__(self):
-        return "[{},{}]".format(self.x, self.y)
+        return "Point({},{})".format(self.x, self.y)
 
 
 class Vector:
@@ -29,17 +64,31 @@ class Vector:
         self.x = x
         self.y = y
 
+    def abs(self):
+        """Return |V|, the length of this vector"""
+        return np.hypot(self.x, self.y)
+    
+    # TODO remove this
     def norm(self):
         """Return ||V||, the norm of this vector"""
-        return sqrt(self.x*self.x + self.y*self.y)
+        return np.sqrt(self.x*self.x + self.y*self.y)
+
+    def __eq__(self, v):
+        return self.x == v.x and self.y == v.y
+    
+    def __hash__(self):
+        return hash(self.x, self.y)
 
     def __add__(self, v):
         return Vector(self.x + v.x, self.y + v.y)
+    
+    def __sub__(self, v):
+        return Vector(self.x - v.x, self.y + v.y)
 
     def __mul__(self, k):
         return Vector(self.x*k, self.y*k)
     
-    def __div__(self, k):
+    def __truediv__(self, k):
         return self*(1/k)
     
     def copy(self):
@@ -61,22 +110,23 @@ class Vector:
         self.y *= d
         return self
     
+    def cosAngle(self, v):
+        """Returns a value within [-1, 1]"""
+        return self.dot(v)/np.sqrt(self.dot(self)*v.dot(v))
+    
     def angle(self, v):
         """Return angle between self and v (will be within [0,pi])"""
-        return acos(self.dot(v)/(self.norm()*v.norm()))
+        return np.arccos(self.cosAngle(v))
         
-    
     def __str__(self):
-        return "({},{})".format(self.x, self.y)
+        return "Vector({},{})".format(self.x, self.y)
 
 
-def vectorPP(p1, p2):
-    """Return a vector from Point p1 to Point p2"""
-    return Vector(p2.x - p1.x, p2.y - p1.y)
-
+Y_AXIS = Vector(0, 1)
+X_AXIS = Vector(1, 0)
 
 class Rect:
-    """A rectangle, yes, really"""
+    """A rectangle"""
     
     def __init__(self, x1, y1, x2, y2):
         self.xmin = x1
@@ -98,46 +148,83 @@ class Rect:
     def height(self): 
         return self.ymax - self.ymin
     
-
-def rectPP(p1, p2):
-    """Return a rectangle with diagonally opposite Points p1 and p2"""
-    if p1.x < p2.x:
-        x1 = p1.x
-        x2 = p2.x
-    else:
-        x1 = p2.x
-        x2 = p1.x
-    if p1.y < p2.y:
-        y1 = p1.y
-        y2 = p2.y
-    else:
-        y1 = p2.y
-        y2 = p1.y
-    return Rect(x1, y1, x2, y2)
+    def __str__(self):
+        return 'Rect({},{},{},{})'.format(self.xmin,self.ymin, self.xmax, self.ymax)
     
 
 class Circle:
-    """A round thing"""
+    """A circle"""
+    
+    _2pi = np.pi*2 # silly optimization
+    _pi2 = np.pi/2 # ditto
     
     def __init__(self, center, r):
-        self.center = center
+        self.center = center.copy()
         self.radius = r
+
         
     def __contains__(self, p):
-        return distancePP(self.center, p) <= self.radius
+        c = self.center
+        return np.hypot(p.x - c.x, p.y - c.y) <= self.radius
     
-    def pointAt(self, angle):
-        return Point(self.center.x + cos(angle)*self.radius,
-                     self.center.y + sin(angle)*self.radius)
+    def pointAtAngle(self, a):
+        """Return point P on circle such that y-axis and MP enclose angle a
+        
+        a increases clockwise
+        """
+        
+        a = self._pi2 - a
+        return Point(self.center.x + np.cos(a)*self.radius,
+                     self.center.y + np.sin(a)*self.radius)
+        
+    def polarAngleTo(self, P):
+        """Return angle between y-axis and line MP
+        
+        a increases clockwise
+        """
+        
+        # careful, y component comes first here
+        a = np.arctan2(P.y - self.center.y, P.x - self.center.x) 
+        a = self._pi2 - a
+        return a if a > 0 else a + self._2pi
     
+    def intersectFrom(self, I, O):
+        """Return point at with the circle meets intersecting line IO.
+        
+            @I     point inside
+            @O     point outside
+            
+        There are many ways to do this. The fastest way seems to be
+        to simply solve the quadratic equation. (The assumption here
+        is that trigonometric functions are slower to compute than
+        square roots)
+        """
+        
+        # Easier to solve if circle has center (0, 0)
+        I -= self.center
+        O -= self.center
+        
+        v = I.vector(O)
+        # We solve (I.x + t*v.x)^2 + (I.y + t*v.y)^2 = r^2 for t
+        a = v.x*v.x + v.y*v.y
+        b = 2*(I.x*v.x + I.y*v.y)
+        c = I.x*I.x + I.y*I.y - self.radius*self.radius
+        
+        # Note that we can ignore the second solution here, because
+        # t *has* to be positive.
+        tmp = b*b - 4*a*c
+        assert tmp >= 0
+        t = (-b + np.sqrt(tmp))/(2*a)
+        # Need to add back center point
+        return Point(I.x + self.center.x + t*v.x, 
+                     I.y + self.center.y + t*v.y)
+        
+        
+    def __str__(self):
+        return 'Circle({},{},{})'.format(self.center.x, self.center.y, self.radius)
+        
+        
     
 
-def distance2d(x1, y1, x2, y2):
-    dx = x2-x1
-    dy = y2-y1
-    return sqrt(dx*dx + dy*dy)
-
-def distancePP(p1, p2):
-    return distance2d(p1.x, p1.y, p2.x, p2.y)
 
     

@@ -17,7 +17,8 @@ The following simplifications have been made:
 """
 
 from gui import App
+from config import Settings
 
 
-app = App()
+app = App(Settings())
 app.run()
