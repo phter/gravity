@@ -75,12 +75,14 @@ class Universe:
         self.rect = rect
         self.bodies = bodies
         self.gravity = gravity
+        self.bodyIndexes = range(len(self.bodies))
         self.createArrays()
         
     def createArrays(self):
         nBodies = len(self.bodies)
         # Data arrays
         self.bodyPos = np.array([[body.pos.x, body.pos.y] for body in self.bodies])
+        self.radius2 = np.array([body.radius*body.radius for body in self.bodies])
         self.aMassG = np.array([body.mass*self.gravity for body in self.bodies])
         self.aRes = np.zeros(2)
         # Buffers
@@ -89,6 +91,17 @@ class Universe:
         # Views
         self.aVecX = self.aVec[:,0]
         self.aVecY = self.aVec[:,1]
+        
+    def containingBody(self, pos):
+        self.aRes[0] = pos.x
+        self.aRes[1] = pos.y
+        np.subtract(self.bodyPos, self.aRes, out=self.aVec)
+        np.power(self.aVec, 2, out=self.aVec)
+        np.add(self.aVecX, self.aVecY, out=self.aBuf)
+        for i in self.bodyIndexes:
+            if self.aBuf[i] < self.radius2[i]:
+                return self.bodies[i]
+        return None
        
     def gravityVector(self, pos, gv):
         """Return the gravitational force vector at a given position
@@ -100,29 +113,25 @@ class Universe:
         We do not have many bodies, so this is only 10-15% faster than
         doing it in pure python.
         """
-        aRes = self.aRes
-        aVec = self.aVec
-        aBuf = self.aBuf
         
-        np.copyto(aVec, self.bodyPos)
-        aRes[0] = pos.x
-        aRes[1] = pos.y
         # Create Vectors from position to body center
-        aVec -= aRes
+        self.aRes[0] = pos.x
+        self.aRes[1] = pos.y
+        np.subtract(self.bodyPos, self.aRes, out=self.aVec)
         # The gravitational force f = GM/d**2
         # We want to scale each vector to a length of f, so we need to 
         # first normalize it, then multiply by f, thus we get
         #    v_f = v/|v| * GM/d**2
         #        = v/d * GM/d**2
         #        = v * GM/d**3
-        np.hypot(self.aVecX, self.aVecY, out=aBuf)
-        aBuf **= 3
-        np.divide(self.aMassG, aBuf, out=aBuf)
-        aVec *= aBuf[:, np.newaxis]
+        np.hypot(self.aVecX, self.aVecY, out=self.aBuf)
+        self.aBuf **= 3
+        np.divide(self.aMassG, self.aBuf, out=self.aBuf)
+        self.aVec *= self.aBuf[:, np.newaxis]
         # Now we just need to sum all gravitational forces into one vector.
-        aVec.sum(axis=0, out=aRes)
-        gv.x = aRes[0]
-        gv.y = aRes[1]
+        self.aVec.sum(axis=0, out=self.aRes)
+        gv.x = self.aRes[0]
+        gv.y = self.aRes[1]
         return gv
 
     
@@ -297,8 +306,6 @@ class Trajectory(ObjectPath):
         self.state = TrajectoryState(t, self.segments[0])
         self.state2 = TrajectoryState(t, self.segments[0])
         
-        self.orbits = [body.poleOrbit for body in self.universe.bodies]
-        
         self.calculatedSegments = 0
         
         # Buffers to reduce amount of allocated Vector objects
@@ -423,32 +430,40 @@ class Trajectory(ObjectPath):
             if state.length > self.max_len:
                 return False
             
-            for orbit in self.orbits:
-                if state.pos in orbit.circle:
-                    circ = orbit.circle
-                    # Note the order here: the first point has to lie
-                    # within the circle
-                    m = circ.intersectFrom(state.pos, lState.pos)
-                    yAngle = circ.polarAngleTo(m)
-                    # adjust values for landing spot
-                    d = lState.pos.distance(m)/lState.pos.distance(state.pos)
-                    state.time = lState.time + (state.time - lState.time)*d
-                    state.pos = lState.pos*(1 - d) + state.pos*d
-                    # Since we landed, velocity is zero
-                    state.velocity = Vector(0, 0)
-                    state.length = lState.length + (state.length - lState.length)*d
-                    self.addState(state)
-                    self.cumError += seg_err*d
-                    self.endTime = state.time
-                    self.logTrajectory()
-                    self.onHit(state.time, orbit.body, yAngle)
-                    return True if state.time > targetTime else False
-            
+            body = self.universe.containingBody(state.pos)
+            if body is not None:
+                d = self.calculateLandingSegment(body, state, lState)
+                self.cumError += seg_err*d
+                return state.time > targetTime
+    
             self.addState(state)
             self.cumError += seg_err
             state, lState = lState, state
              
         return True
+    
+    def calculateLandingSegment(self, body, state, lState):
+        """Calculates the last segment of a trajectory hitting a planet
+        
+        Returns distance to landing spot relative to segment length.
+        """
+        
+        # Note the order here: the first point has to lie
+        # within the circle
+        m = body.intersectFrom(state.pos, lState.pos)
+        yAngle = body.polarAngleTo(m)
+        # adjust values for landing spot
+        d = lState.pos.distance(m)/lState.pos.distance(state.pos)
+        state.time = lState.time + (state.time - lState.time)*d
+        state.pos = lState.pos*(1 - d) + state.pos*d
+        # Since we landed, velocity is zero
+        state.velocity = Vector(0, 0)
+        state.length = lState.length + (state.length - lState.length)*d
+        self.addState(state)
+        self.endTime = state.time
+        self.logTrajectory()
+        self.onHit(state.time, body, yAngle)
+        return d
         
     def vError(self, force, velocity):
         """Calculates the area of the parallelogram spanned by the two vectors"""
