@@ -15,11 +15,34 @@ class Point:
         return Point(self.x + p.x, self.y + p.y)
     
     def __sub__(self, p):
-        return Point(self.x - p.x, self.y - p.y)
-    
+        return Point(self.x - p.x, self.y - p.y)  
+        
     def __mul__(self, k):
         return Point(self.x*k, self.y*k)
+        
+    def __truediv__(self, k):
+        return Point(self.x/k, self.y/k)
     
+    def __iadd__(self, p):
+        self.x += p.x
+        self.y += p.y
+        return self
+    
+    def __isub__(self, p):
+        self.x -= p.x
+        self.y -= p.y
+        return self
+        
+    def __imul__(self, k):
+        self.x *= k
+        self.y *= k
+        return self
+        
+    def __itruediv__(self, k):
+        self.x /= k
+        self.y /= k
+        return self
+
     def __eq__(self, p):
         return self.x == p.x and self.y == p.y
     
@@ -90,6 +113,26 @@ class Vector:
     
     def __truediv__(self, k):
         return self*(1/k)
+    
+    def __iadd__(self, v):
+        self.x += v.x
+        self.y += v.y
+        return self
+    
+    def __isub__(self, v):
+        self.x -= v.x
+        self.y -= v.y
+        return self
+        
+    def __imul__(self, k):
+        self.x *= k
+        self.y *= k
+        return self
+        
+    def __itruediv__(self, k):
+        self.x /= k
+        self.y /= k
+        return self
     
     def copy(self):
         return Vector(self.x, self.y)

@@ -56,9 +56,10 @@ class Container:
 
 def sliderRow(frame, **desc):
     """Return a Label, Scale widget pair"""
+    
     text = desc.get('text', '')
     del desc['text']
-    desc['length'] = 150
+    desc['length'] = Config.sliderWidth
     desc['orient'] = tk.HORIZONTAL
     slider = tk.Scale(frame, **desc)
     label = tk.Label(frame, text=text)
@@ -66,6 +67,8 @@ def sliderRow(frame, **desc):
 
 
 class Sliders(Container):
+    """Sliders for game settings"""
+    
     def __init__(self, parent):
         Container.__init__(self, parent)
         self.sliders = []
@@ -133,13 +136,15 @@ class Sliders(Container):
         
 
 class ControlArea(Container):
+    """Area for widgets controling the ship"""
+    
     def __init__(self, parent):
         Container.__init__(self, parent)
         self.frame.configure(borderwidth=2, pady=10)
         self.launchButton = tk.Button(self.frame, 
                                       text='Launch', 
-                                      command=self.app.cmd_launchShip, 
-                                      bg='#c02020')
+                                      command=self.app.cmd_launchShip,
+                                      bg=Config.colors['launchButton'].tkString())
         self.thrustSliderRow = sliderRow(
                 self.frame,
                 variable=self.app.s_shipThrust,
@@ -159,7 +164,7 @@ class ControlArea(Container):
     def updateAnimationSpeed(self, s):
         ns = Config.scaleFunc(Config.timeFactor, float(s))
         self.app.gameTimeFactor = ns
-        log('Control', 'Changed animation speed to ' + str(ns))
+        # log('Control', 'Changed animation speed to ' + str(ns))
         
     def layout(self):
         label, slider = self.animationSliderRow
@@ -172,6 +177,8 @@ class ControlArea(Container):
 
 
 class Buttons(Container):
+    """Buttons area"""
+    
     def __init__(self, parent):
         Container.__init__(self, parent)
         self.quitButton = tk.Button(self.frame, text='Quit', command=self.app.quit)
@@ -184,9 +191,16 @@ class Buttons(Container):
 
 
 class Clock(Container):
+    """Clock display"""
+    
+    fmtString = '{:02}d {:02}h {:02}m {:02}s'
+    
     def __init__(self, parent):
         Container.__init__(self, parent)
-        self.label = tk.Label(self.frame, width=18, text='0d  0h 0m')
+        self.label = tk.Label(self.frame, 
+                              width=18, 
+                              text=self.fmtString.format(0, 0, 0, 0),
+                              bg=Config.colors['clockBackground'].tkString())
         
     def layout(self):
         self.label.grid()
@@ -198,10 +212,12 @@ class Clock(Container):
         cm = m % 60
         ch = h % 24
         cd = h // 24
-        self.label.config(text=str(cd)+'d  '+str(ch) + 'h  '+str(cm)+'m')
+        self.label.config(text=self.fmtString.format(cd, ch, cm, t % 60))
 
 
 class Controls(Container):
+    """Game controls"""
+    
     def __init__(self, parent, app):
         Container.__init__(self, parent)
         self.sliders = Sliders(self)
@@ -215,6 +231,8 @@ class Controls(Container):
 
         
 class Display(Container):
+    """Universe display"""
+    
     def __init__(self, parent):
         Container.__init__(self, parent)
         
@@ -224,7 +242,7 @@ class Display(Container):
         self.c2u = 1/self.u2c
         self.cWidth = Config.canvasWidth
         self.cHeight = uniRect.height()*self.u2c
-        self.cColor = Config.canvasColor
+        self.cColor = Config.colors['canvasBackground'].tkString()
         self.canvas = tk.Canvas(self.frame, width=self.cWidth, height=self.cHeight, bg=self.cColor)
         self.bodyViews = []
         self.shipView = None
@@ -279,6 +297,8 @@ class Display(Container):
 
 
 class BodyView:
+    """View responsible for drawing (rotating) bodies"""
+    
     def __init__(self, body, color, uni2canvas, scale):
         self.id = None # filled later
         self.rotID = None # filled later
@@ -317,6 +337,8 @@ class BodyView:
 
 
 class ShipView:
+    """View responsible for drawing the ship"""
+    
     def __init__(self, ship, size, uni2canvas, scale):
         self.id = None # filled later
         self.ship = ship
@@ -352,6 +374,8 @@ class ShipView:
                 
 
 class MainFrame(Container):
+    """Main area containing the universe display"""
+    
     def __init__(self, parent):
         Container.__init__(self, parent)
         self.display = Display(self)
@@ -361,6 +385,7 @@ class MainFrame(Container):
         
   
 class SideFrame(Container):
+    """Side frame containing controls etc."""
     def __init__(self, parent):
         Container.__init__(self, parent)
         self.clock = Clock(self)
@@ -372,6 +397,8 @@ class SideFrame(Container):
 
 
 class App(Container):
+    """Main application"""
+    
     def __init__(self, settings):
         Container.__init__(self, None)
         self.settings = settings
@@ -411,12 +438,18 @@ class App(Container):
         self.shouldUpdateSlow = Config.updateIntervalSlow  # in ms
         self.atLeastUpdate = self.shouldUpdate*1.15 / 1000 # in s
         
-        self.lastUpdate = self.realTime()
+        currentTime = self.realTime()
+        self.lastUpdate = currentTime
         self.lastGameTime = 0
         self.gameTimeFactor = Config.timeFactor
         
         self.nUpdateLags = 0
         self.nUpdates = 0
+
+        self.lastUpdateSlow = currentTime
+
+        self.totalLag = 0
+        self.lastTotalLag = 0
         
         # Should be last
         self.updateFast()
@@ -449,7 +482,9 @@ class App(Container):
         
     def updateFast(self):
         t = self.realTime()
-        if t - self.lastUpdate > self.atLeastUpdate:
+        diff = t - self.lastUpdate
+        if diff > self.atLeastUpdate:
+            self.totalLag += diff
             self.nUpdateLags += 1
             
         if self.game is not None and self.animating:
@@ -462,12 +497,21 @@ class App(Container):
         self.frame.after(self.shouldUpdate, self.updateFast)
         
     def updateSlow(self):
+        t = self.realTime()
+        
         if self.game is not None:
-            gt = self.gameTime(self.realTime())
+            diff = t - self.lastUpdateSlow
+            lag = (self.totalLag - self.lastTotalLag)/diff
+            if lag > 0.1:
+                log('App', 'Avg lag/s: {}'.format(lag))
+                
+            #log('App', 'Total lag ' + str(self.totalLag))
+            gt = self.gameTime(t)
             self.updateClock(gt)
-            log('App', 'Number of slow updates: {}% '.format(
-                    self.nUpdateLags/self.nUpdates*100))
             # self.logState(t)
+            
+        self.lastTotalLag = self.totalLag
+        self.lastUpdateSlow = t
         self.frame.after(self.shouldUpdateSlow, self.updateSlow)
         
     def cmd_launchShip(self):

@@ -81,10 +81,12 @@ class Ship:
         
         pos, velocity = orbit.posVelocity(t)
         orbit.endTime = t
-        
+        log('Ship', 'Orbital velocity: ' + str(velocity))
         v = orbit.body.pos.vector(pos)
         v.scaleTo(thrust)
+        log('Ship', 'Thrust vector: ' + str(v))
         v += velocity
+        log('Ship', 'Acceleration: ' + str(v))
         
         traj = Trajectory(t, pos, v, 
                           self.universe, 
@@ -141,12 +143,13 @@ class Game:
     def __init__(self, settings):
         self.settings = settings
         self.universe = None
-        self.startPlanet = None
-        self.targetPlanet = None
+        self.startPlanet = None     # planet where ship starts
+        self.targetPlanet = None    # planet where we want to go to
         self.ship = None
         self.startTime = 0
-        self.endTime = np.Inf
-        self.lastUpdate = 0
+        self.endTime = np.Inf       # game time when game ended
+        self.lastUpdate = 0         # game time of last update
+        
         self.planetTypes = {
                 'normal': PlanetType('normal', 
                                      radius=settings.planetRadiusNormal,
@@ -178,12 +181,17 @@ class Game:
             @t       start time
         """
         log('Game', 'Starting new game')
+        
         # List of trajectories of the ship
         self.trajectories = []
         self.startTime = time.perf_counter()
     
     def launchShip(self, gt, thrust):
-        self.ship.launch(thrust, gt)
+        """Launches a ship at game time gt with thrust thrust"""
+        if self.ship.planet is not None:
+            self.ship.launch(thrust, gt)
+        else:
+            log('Game', 'Can not launch ship when not on planet')
     
     def update(self, gt):
         self.ship.update(gt)
@@ -291,13 +299,13 @@ class PlanetGenerator:
                     success = False
                     break
             if success:
-                log('findPosition', '{} tries to find empty space'.format(i + 1))
+                log('PlanetGenerator', '{} tries to find empty space'.format(i + 1))
                 return pos
         return None # failed to find a position
     
     # Helper function to add planets of a given type
     def addPlanets(self, pt):
-        log('PlanetGennerator', 'Createing {n} {s} planets (radius: {r})'.format(
+        log('PlanetGenerator', 'Creating {n} {s} planets (radius: {r})'.format(
                 n=pt.count, s=pt.name, r=pt.radius))
         pr = self.planetRect
         dr = pt.radius*self.spread

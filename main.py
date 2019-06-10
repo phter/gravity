@@ -13,7 +13,7 @@ The following simplifications have been made:
    * Ships are launched with infinite acceleration, ie. the user can determine 
      the initial thrust and the ship will reach its maximum speed instantly.
    * Ships land with infinite (negative) acceleration, ie. we are not concerned 
-     with "soft" landings.
+     with "soft" landings (assuming fantastic airbag technology :)
 """
 
 from gui import App

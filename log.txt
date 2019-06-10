@@ -1,9 +1,5 @@
 Logbuch
 
-
-wer hat was wann getan...
-
-
 bab barbara honeder
 jan jan koegl
 ph  philipp weinfurter
@@ -11,17 +7,65 @@ ph  philipp weinfurter
 (x) ... x Stunden
 
 
-9.5.2019:
+9.5:
 bab, jan, ph: Projektbesprechung, Themenfindung, Konzepterstellung (2)
 
-15.5.2019:
+10.5:
+ph: Begin Prototyp  (4)
+
+15.5:
 bab, jan, ph: Arbeitsaufteilung (1)
 
-29.5.2019:
+17.5:
+ph: Prototyp für Spiel (4)
+
+19.5:
+ph: GUI: - Design der Klassen
+         - Grundlegendes Layout
+         - Dokumentation             (8)
+         
+20.5:
+ph: Konfiguration planen und erstellen (3)
+
+22.5:
+ph: Erzeugung der Planeten (4)
+
+26.5:
+ph: Geometrie Bibliothek (4)
+
+27.5:
+ph: Rotation der Planeten, Dokumentation (4)
+
+28.5:
+ph: Utility Bibliothek (1)
+
+29.5:
 bab, jan, ph: Spieldesign, Steuerung (2)
 
+29.5:
+ph: GUI: - Implementierung Spielzeit / Echtzeit
+         - Implementierung Raumkoordinaten / Canvaskoordinaten (6)
 
+30.5:
+ph: Steuerung Schub, Dokumentation (4)
 
+1.6:
+ph: Modellierung des Raumschiffs (6)
+
+2.6:
+ph: Physik Bibliothek, Logging      (2)
+
+3.6:
+ph: Einbindung von numpy, vorhanden Code umschreiben   (2)
+
+4.6:
+ph: Berechnung der Flugbahn, Dokumentation (4)
+
+6.6:
+ph: Berechnung der Flugbahn, Dokumentation, Clean-up (4)
+
+10.6:
+ph: Berechnung des Landepunktes (2)
 
 
 

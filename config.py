@@ -21,28 +21,34 @@ class Config:
 
     windowTitle = 'G.r.a.v.i.t.y'
     canvasWidth = 1024 # height depends on uniRect ratio
-    canvasColor = '#100080'
     
     # Time (in ms) between updates of the GUI
     updateIntervalFast = 75
     # Time (in ms) between updates of less critical stuff (clock, etc.)
     updateIntervalSlow = 1000
 
-
     colors = {
+            'canvasBackground': Color(14, 0, 80),
+            'shipColor': Color(224, 224, 16),
+            'shipOutlineColor': Color(224, 16, 16),
+            
+            'launchButton': Color(192, 32, 32),
+            'clockBackground': Color(230, 230, 230),
+            
             'startPlanet': Color(16, 200, 200),
             'targetPlanet': Color(16, 220, 48),
             'planet': Color(220, 16, 32),
-            'planetOutline': Color(128, 128, 128),
-            'planetRotor': Color(128, 128, 128),
+            'planetOutline': Color(5, 5, 5),
+            'planetRotor': Color(100, 100, 100),
             'ship': Color(224, 224, 16),
             'shipOutline': Color(224, 16, 16)
             }
     
+    # Width of control sliders
+    sliderWidth = 150
+    
     # Box size in pixels
     shipSize = 8
-    shipColor = Color(224, 224, 16)
-    shipOutlineColor = Color(224, 16, 16)
 
     # Visible universe
     uniRect = Rect(0, 0, 4e8, 2.8e8)
@@ -76,10 +82,6 @@ class Config:
     # How many in-game seconds pass per second
     timeFactor = 300
     timeScale = 15
-
-    #
-    # GUI stuff
-    #
 
     # Gives us a smooth scaling function for positive values
     # Call this function with Config.scaleFunc(value, scale), where
@@ -150,14 +152,18 @@ class Settings:
         return Config.scaleFunc(Config.timeFactor, self.s_animationSpeed)
 
 
+# For all of these, we will create two attributes:
+#   1) Settings.{name}  will be set to the third value
+#   2) Settings.{name}Range will be set to an interval [first, second] value.
 settingVars = {
-        # setting    (min, max, default)
+        # Scaling values
         's_planetSize': (-5, 5, 0),
         's_planetDensity': (-5, 5, 0),
-        's_planetRotation': (-3, 3, 0),
+        's_planetRotation': (-15, 15, 0),
         's_gravityConstant': (-5, 5, 0),
         's_animationSpeed': (-5, 5, 0),
         
+        # Absolute values
         'planetSpread': (1, 4, 2),
         'nSmallPlanets': (0, 10, 5),
         'nNormalPlanets': (0, 8, 3),
