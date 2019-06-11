@@ -114,9 +114,11 @@ class Settings:
     @property
     def planetRadiusNormal(self): 
         return self.planetSize
+    
     @property
     def planetRadiusLarge(self): 
         return self.planetSize*Config.fRadiusLarge
+    
     @property
     def planetRadiusSmall(self): 
         return self.planetSize*Config.fRadiusSmall
@@ -124,6 +126,7 @@ class Settings:
     @property
     def planetDensityNormal(self): 
         return self.planetDensity
+    
     @property
     def planetDensityLarge(self): 
         return self.planetDensity*Config.fDensityLarge

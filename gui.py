@@ -11,23 +11,24 @@ from geometry import Point, Circle, Rect
 
 class Container:
     """Container for widgets / other containers
-    
+
         @parent     parent container
-        
+
     Helper class to simplify layout generation:
     Tkinter doesn't like it, if a parent's .grid() method is called
-    before .grid() has been called on all children. This class takes care 
+    before .grid() has been called on all children. This class takes care
     of that:
-        
-        .layout() 
+
+        .layout()
             should create the layout of all widgets inside.
-        .position(row, column) 
-            will call grid and make sure layout() gets called first, 
+        .position(row, column)
+            will call grid and make sure layout() gets called first,
             if it hasn't already been called.
 
     Generally speaking, there is no reason to call .layout() manually.
     Just call .position() as you would call .grid() on a widget.
     """
+
     def __init__(self, parent):
         if parent is None:
             app = None
@@ -39,24 +40,24 @@ class Container:
         self.app = app
         self.frame = tk.Frame(parentFrame)
         self.hasLayout = False
-        
+
     def position(self, row=None, column=None, **kwds):
         if not self.hasLayout:
             self.layout()
             self.hasLayout = True
-        
+
         kwds['row'] = row
         kwds['column'] = column
         self.frame.grid(**kwds)
-        
+
     # Stub, must be overridden by subclasses
     def layout(self):
         raise NotImplementedError("Missing layout method in " + self.__class__.__name__)
-        
+
 
 def sliderRow(frame, **desc):
     """Return a Label, Scale widget pair"""
-    
+
     text = desc.get('text', '')
     del desc['text']
     desc['length'] = Config.sliderWidth
@@ -67,28 +68,31 @@ def sliderRow(frame, **desc):
 
 
 class Sliders(Container):
-    """Sliders for game settings"""
-    
+    """Sliders for game settings
+
+        @parent      parent container
+    """
+
     def __init__(self, parent):
         Container.__init__(self, parent)
         self.sliders = []
-        
+
         var = self.app.settingVariables
         s = self.app.settings
         sliders = [
-                {'variable': var['s_planetSize'], 
+                {'variable': var['s_planetSize'],
                  'text': 'Planet size',
                  'from_': s.s_planetSizeRange.start,
                  'to': s.s_planetSizeRange.end,
                  'resolution': 0.1
                  },
-                 {'variable': var['s_planetDensity'], 
+                 {'variable': var['s_planetDensity'],
                  'text': 'Planet density',
                  'from_': s.s_planetDensityRange.start,
                  'to': s.s_planetDensityRange.end,
                  'resolution': 0.1
                  },
-                 {'variable': var['s_planetRotation'], 
+                 {'variable': var['s_planetRotation'],
                  'text': 'Rotation speed',
                  'from_': s.s_planetRotationRange.start,
                  'to': s.s_planetRotationRange.end,
@@ -100,7 +104,7 @@ class Sliders(Container):
                   'to': s.s_gravityConstantRange.end,
                   'resolution': 0.1
                  },
-                 {'variable': var['planetSpread'], 
+                 {'variable': var['planetSpread'],
                  'text': 'Planet distance',
                  'from_': s.planetSpreadRange.start,
                  'to': s.planetSpreadRange.end,
@@ -111,38 +115,41 @@ class Sliders(Container):
                   'from_': s.nSmallPlanetsRange.start,
                   'to': s.nSmallPlanetsRange.end,
                   'resolution': 1
-                 },                 
+                 },
                  {'variable': var['nNormalPlanets'],
                   'text': 'Number of normal planets',
                   'from_': s.nNormalPlanetsRange.start,
                   'to': s.nNormalPlanetsRange.end,
                   'resolution': 1
-                 },                  
+                 },
                  {'variable': var['nLargePlanets'],
                   'text': 'Number of large planets',
                   'from_': s.nLargePlanetsRange.start,
                   'to': s.nLargePlanetsRange.end,
                   'resolution': 1
                  }]
-        
+
         for desc in sliders:
             row = sliderRow(self.frame, **desc)
             self.sliders.append(row)
-            
+
     def layout(self):
         for i, (label, slider) in enumerate(self.sliders):
             label.grid(row=i, column=0)
             slider.grid(row=i, column=1)
-        
+
 
 class ControlArea(Container):
-    """Area for widgets controling the ship"""
-    
+    """Area for widgets controling the ship
+
+        @parent      parent container
+    """
+
     def __init__(self, parent):
         Container.__init__(self, parent)
         self.frame.configure(borderwidth=2, pady=10)
-        self.launchButton = tk.Button(self.frame, 
-                                      text='Launch', 
+        self.launchButton = tk.Button(self.frame,
+                                      text='Launch',
                                       command=self.app.cmd_launchShip,
                                       bg=Config.colors['launchButton'].tkString())
         self.thrustSliderRow = sliderRow(
@@ -160,12 +167,12 @@ class ControlArea(Container):
                 to=Config.timeScale,
                 resolution=0.1,
                 command=self.updateAnimationSpeed)
-        
+
     def updateAnimationSpeed(self, s):
         ns = Config.scaleFunc(Config.timeFactor, float(s))
         self.app.gameTimeFactor = ns
         # log('Control', 'Changed animation speed to ' + str(ns))
-        
+
     def layout(self):
         label, slider = self.animationSliderRow
         label.grid(row=0, column=0)
@@ -177,34 +184,39 @@ class ControlArea(Container):
 
 
 class Buttons(Container):
-    """Buttons area"""
-    
+    """Buttons area
+
+        @parent     parent container
+    """
+
     def __init__(self, parent):
         Container.__init__(self, parent)
         self.quitButton = tk.Button(self.frame, text='Quit', command=self.app.quit)
         self.playButton = tk.Button(self.frame, text='New Game', command=self.app.startGame)
 
-        
     def layout(self):
         self.playButton.grid(row=1,column=0)
         self.quitButton.grid(row=1,column=1)
 
 
 class Clock(Container):
-    """Clock display"""
-    
+    """Clock display
+
+        @parent       parent container
+    """
+
     fmtString = '{:02}d {:02}h {:02}m {:02}s'
-    
+
     def __init__(self, parent):
         Container.__init__(self, parent)
-        self.label = tk.Label(self.frame, 
-                              width=18, 
+        self.label = tk.Label(self.frame,
+                              width=18,
                               text=self.fmtString.format(0, 0, 0, 0),
                               bg=Config.colors['clockBackground'].tkString())
-        
+
     def layout(self):
         self.label.grid()
-    
+
     def update(self, t):
         t = int(t)
         m = t // 60
@@ -216,8 +228,12 @@ class Clock(Container):
 
 
 class Controls(Container):
-    """Game controls"""
-    
+    """Game controls
+
+        @parent      parent container
+        @app         application
+    """
+
     def __init__(self, parent, app):
         Container.__init__(self, parent)
         self.sliders = Sliders(self)
@@ -229,21 +245,27 @@ class Controls(Container):
         self.launcher.position(1, 0)
         self.buttons.position(2, 0)
 
-        
+
 class Display(Container):
-    """Universe display"""
-    
+    """Universe display
+
+        @parent     parent container
+    """
+
     def __init__(self, parent):
         Container.__init__(self, parent)
-        
-        uniRect = Config.uniRect 
+
+        uniRect = Config.uniRect
         # factors to translate universe coordinates to canvas cordinates and back
-        self.u2c = Config.canvasWidth / uniRect.width() 
+        self.u2c = Config.canvasWidth / uniRect.width()
         self.c2u = 1/self.u2c
         self.cWidth = Config.canvasWidth
         self.cHeight = uniRect.height()*self.u2c
         self.cColor = Config.colors['canvasBackground'].tkString()
-        self.canvas = tk.Canvas(self.frame, width=self.cWidth, height=self.cHeight, bg=self.cColor)
+        self.canvas = tk.Canvas(self.frame,
+                                width=self.cWidth,
+                                height=self.cHeight,
+                                bg=self.cColor)
         self.bodyViews = []
         self.shipView = None
 
@@ -251,45 +273,48 @@ class Display(Container):
         cp.x = up.x*self.u2c
         cp.y = self.cHeight - up.y*self.u2c
         return cp
-        
+
     def canvas2uni(self, cp, up):
         up.x = cp.x*self.c2u
         up.y = (self.cHeight - cp.y)*self.c2u
         return up
-        
+
     def reset(self, bodies):
         for id in self.canvas.find_all():
             self.canvas.delete(id)
 
         self.bodyViews = []
-        self.shipView = None 
+        self.shipView = None
         self.createViews()
-        
+
     def createViews(self):
         self.createBodyViews()
         self.createShipView()
-        
+
     def createBodyViews(self):
         bodies = self.app.game.universe.bodies
-        
+
         def createView(body, col):
             bv = BodyView(body, Config.colors[col], self.uni2canvas, self.u2c)
             bv.draw(self.canvas)
             self.bodyViews.append(bv)
-        
+
         createView(bodies[0], 'startPlanet')
         createView(bodies[1], 'targetPlanet')
         for body in bodies[2:]:
             createView(body, 'planet')
-            
+
     def createShipView(self):
-        sv = ShipView(self.app.game.ship, Config.shipSize, self.uni2canvas, self.u2c)
+        sv = ShipView(self.app.game.ship,
+                      Config.shipSize,
+                      self.uni2canvas,
+                      self.u2c)
         sv.draw(self.canvas)
         self.shipView = sv
-        
+
     def layout(self):
         self.canvas.grid()
-        
+
     def update(self, gt):
         self.shipView.update(self.canvas, gt)
         for bv in self.bodyViews:
@@ -297,8 +322,14 @@ class Display(Container):
 
 
 class BodyView:
-    """View responsible for drawing (rotating) bodies"""
-    
+    """View responsible for drawing (rotating) bodies
+
+        @body        body for this view
+        @color       a Color instance
+        @uni2canvas  a function to translate universe coords to canvas coords
+        @scale       scale factor  (canvas width / universe width)
+    """
+
     def __init__(self, body, color, uni2canvas, scale):
         self.id = None # filled later
         self.rotID = None # filled later
@@ -307,38 +338,44 @@ class BodyView:
         self.circle = Circle(self.u2c(body.pos, Point(0, 0)), body.radius*scale)
         self.body = body
         self.col = color
-    
+
     def draw(self, canvas):
         c = self.circle
-        self.id = canvas.create_oval(c.center.x - c.radius, 
-                                     c.center.y - c.radius, 
-                                     c.center.x + c.radius, 
-                                     c.center.y + c.radius, 
-                                     fill=self.col.tkString(), 
+        self.id = canvas.create_oval(c.center.x - c.radius,
+                                     c.center.y - c.radius,
+                                     c.center.x + c.radius,
+                                     c.center.y + c.radius,
+                                     fill=self.col.tkString(),
                                      outline=Config.colors['planetOutline'].tkString())
         rp = c.pointAtAngle(0)
-        self.rotID = canvas.create_line(c.center.x, 
+        self.rotID = canvas.create_line(c.center.x,
                                         c.center.y,
                                         rp.x,
-                                        rp.y, 
+                                        rp.y,
                                         width=2,
                                         fill=Config.colors['planetRotor'].tkString())
-        
+
     def update(self, canvas, gt):
         a = self.body.bodyAngleAt(gt)
         c = self.circle
         p = c.pointAtAngle(a)
         p.y = 2*c.center.y - p.y  # because we use screen coordinates
-        canvas.coords(self.rotID, 
-                      c.center.x, 
+        canvas.coords(self.rotID,
+                      c.center.x,
                       c.center.y,
                       p.x,
                       p.y)
 
 
 class ShipView:
-    """View responsible for drawing the ship"""
-    
+    """View responsible for drawing the ship
+
+        @ship          the ship to display
+        @size          size of square around ship display
+        @uni2canvas    a function to translate universe coords to canvas coords
+        @scale         scale factor  (canvas width / universe width)
+    """
+
     def __init__(self, ship, size, uni2canvas, scale):
         self.id = None # filled later
         self.ship = ship
@@ -347,18 +384,18 @@ class ShipView:
         self.size = size
         self.offset = size/2
         self.bufPoint = Point(0, 0)
-        
+
     def getRect(self, gt):
         p = self.u2c(self.ship.positionAt(gt), self.bufPoint)
         return Rect(p.x - self.offset,
                     p.y - self.offset,
                     p.x + self.offset,
                     p.y + self.offset)
-        
+
     def draw(self, canvas):
         r = self.getRect(0)
-        self.id = canvas.create_oval(r.xmin, 
-                                     r.ymin, 
+        self.id = canvas.create_oval(r.xmin,
+                                     r.ymin,
                                      r.xmax,
                                      r.ymax,
                                      fill=Config.colors['ship'].tkString(),
@@ -366,39 +403,48 @@ class ShipView:
 
     def update(self, canvas, gt):
         r = self.getRect(gt)
-        canvas.coords(self.id, 
+        canvas.coords(self.id,
                       r.xmin,
                       r.ymin,
                       r.xmax,
                       r.ymax)
-                
+
 
 class MainFrame(Container):
-    """Main area containing the universe display"""
-    
+    """Main area containing the universe display
+
+        @parent     parent container
+    """
+
     def __init__(self, parent):
         Container.__init__(self, parent)
         self.display = Display(self)
-        
+
     def layout(self):
         self.display.position(0, 0)
-        
-  
+
+
 class SideFrame(Container):
-    """Side frame containing controls etc."""
+    """Side frame containing controls etc.
+
+        @parent     parent container
+    """
     def __init__(self, parent):
         Container.__init__(self, parent)
         self.clock = Clock(self)
         self.controls = Controls(self, self)
-        
+
     def layout(self):
         self.clock.position(0, 0)
         self.controls.position(1, 0)
 
 
 class App(Container):
-    """Main application"""
-    
+    """Main application
+
+        @settings       app settings object
+    """
+
     def __init__(self, settings):
         Container.__init__(self, None)
         self.settings = settings
@@ -415,34 +461,34 @@ class App(Container):
                 'nNormalPlanets': tk.IntVar(),
                 'nLargePlanets': tk.IntVar()
                 }
-    
+
         for k, var in self.settingVariables.items():
             var.set(settings.get(k))
-        
+
         # Game control variables
         self.s_shipThrust = tk.DoubleVar()
         self.s_shipThrust.set(0)
         self.s_animationSpeed = tk.DoubleVar()
         self.s_animationSpeed.set(0)
-  
+
         # Widgets
         self.mainFrame = MainFrame(self)
         self.sideFrame = SideFrame(self)
         self.position(0, 0)
         self.animating = False
-                
+
         self.updateDisplay = self.mainFrame.display.update
         self.updateClock = self.sideFrame.clock.update
-        
+
         self.shouldUpdate = Config.updateIntervalFast      # in ms
         self.shouldUpdateSlow = Config.updateIntervalSlow  # in ms
         self.atLeastUpdate = self.shouldUpdate*1.15 / 1000 # in s
-        
+
         currentTime = self.realTime()
         self.lastUpdate = currentTime
         self.lastGameTime = 0
         self.gameTimeFactor = Config.timeFactor
-        
+
         self.nUpdateLags = 0
         self.nUpdates = 0
 
@@ -450,20 +496,19 @@ class App(Container):
 
         self.totalLag = 0
         self.lastTotalLag = 0
-        
+
         # Should be last
         self.updateFast()
         self.updateSlow()
-        
-        
+
     def realTime(self):
         return time.perf_counter()
-        
+
     def gameTime(self, t):
         gt = self.lastGameTime + (t - self.lastUpdate)*self.gameTimeFactor
         self.lastGameTime = gt
         return gt
-        
+
     def layout(self):
         self.mainFrame.position(0, 0)
         self.sideFrame.position(0, 1)
@@ -479,41 +524,39 @@ class App(Container):
         self.lastGameTime = 0
         self.game.start()
         self.animating = True
-        
+
     def updateFast(self):
         t = self.realTime()
         diff = t - self.lastUpdate
         if diff > self.atLeastUpdate:
             self.totalLag += diff
             self.nUpdateLags += 1
-            
+
         if self.game is not None and self.animating:
             gt = self.gameTime(t)
             self.game.update(gt)
             self.updateDisplay(gt)
-            
+
         self.lastUpdate = t
         self.nUpdates +=1
         self.frame.after(self.shouldUpdate, self.updateFast)
-        
+
     def updateSlow(self):
         t = self.realTime()
-        
+
         if self.game is not None:
             diff = t - self.lastUpdateSlow
             lag = (self.totalLag - self.lastTotalLag)/diff
             if lag > 0.1:
                 log('App', 'Avg lag/s: {}'.format(lag))
-                
-            #log('App', 'Total lag ' + str(self.totalLag))
+
             gt = self.gameTime(t)
             self.updateClock(gt)
-            # self.logState(t)
-            
+
         self.lastTotalLag = self.totalLag
         self.lastUpdateSlow = t
         self.frame.after(self.shouldUpdateSlow, self.updateSlow)
-        
+
     def cmd_launchShip(self):
         planet = self.game.ship.planet
         # Check if the ship is landed on a planet
@@ -523,23 +566,23 @@ class App(Container):
         gt = self.gameTime(t)
         ev = planet.escapeSpeed(self.game.universe.gravity)
         self.game.launchShip(gt, Config.scaleFunc(ev, self.s_shipThrust.get()))
-    
+
     def logState(self, t):
         self.game.logState(t)
-        
+
     def run(self):
         self.frame.mainloop()
-        
+
     def quit(self):
         self.frame.quit()
-        
 
 
- 
-            
-        
-    
-        
-        
+
+
+
+
+
+
+
 
 

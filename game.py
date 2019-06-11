@@ -205,7 +205,6 @@ class Game:
         self.ship.logState(t)
             
 
-
 class PlanetGenerator:
     """Helper class to create planets
     
@@ -218,16 +217,10 @@ class PlanetGenerator:
     
          +-----+-------------------------------------+-----+
          |     |                                     |     |
-         |     |                                     |     |
          |     |            planet area              |     |
          |     |                                     |     |
          |     |                                     |     |
-         |     |                                     |     |
-         |     |                                     |     |
-         |     |                                     |     |
          |   <-----start area          target area----->   |
-         |     |                                     |     |
-         |     |                                     |     |
          |     |                                     |     |
          +-----+-------------------------------------+-----+
     """
@@ -268,8 +261,7 @@ class PlanetGenerator:
             if self.addPlanets(self.pTypes['small']):
                 return
         raise Exception("Failed to create planets")
-        
-    
+
     def createStartAndTarget(self):
         ur = self.uniRect
         # make sure the start planet is not right at the top or bottom 

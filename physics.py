@@ -6,6 +6,7 @@ of all bodies combined at this point.
 
 """
 
+
 import numpy as np
 from geometry import Point, Vector, Circle
 from config import Config
@@ -13,18 +14,22 @@ from util import log
 import phylib
 
 
-
 class Body(Circle):
-    """ Body - generic object in the game universe
+    """ Body - generic shperical object in the game universe
     
+    @type        String describing the typde of body
     @pos         position (Point)
     @radius      radius of object
-    @rotation    angular velocity of body
-                 in radians  / time unit
-                  0: no rotation
-                 >0: clockwise
-                 <0: counterclockwise
+    @rotation    angular velocity of body, in radians  / s
+                   0: no rotation
+                 > 0: clockwise
+                 < 0: counterclockwise
+    @density     density of body, in kg/m**3
+    
+    The pole of a body is the initial point on the surface that lies
+    on the (positive) y-axis.
     """
+    
     def __init__(self, type, pos, radius, rotation, density):
         Circle.__init__(self, pos, radius)
         self.id = None # will be set later
@@ -53,13 +58,18 @@ class Body(Circle):
     
     def orbit(self, t, yAngle):
         """Return an orbit starting at the given angle (rel. to y-axis)"""
-        
         return SurfaceOrbit(t, self, yAngle - self.bodyAngleAt(t))
     
-    def escapeSpeed(self, gravity, radius=None):
-        if radius is None:
-            radius = self.radius
-        return phylib.escapeSpeed(self.mass, radius, gravity)
+    def escapeSpeed(self, gravity, distance=None):
+        """Return the escape speed needed to leave gravitational field
+        
+            @gravity       gravitational constant
+            @distance      distance from center of mass       
+        """
+        
+        if distance is None:
+            distance = self.radius
+        return phylib.escapeSpeed(self.mass, distance, gravity)
     
     
 class Universe:
@@ -71,6 +81,7 @@ class Universe:
         @gravity    gravitational constant
     
     """
+    
     def __init__(self, bodies, rect, gravity):
         self.rect = rect
         self.bodies = bodies
@@ -93,6 +104,8 @@ class Universe:
         self.aVecY = self.aVec[:,1]
         
     def containingBody(self, pos):
+        """Return body that contains pos or None"""
+        
         self.aRes[0] = pos.x
         self.aRes[1] = pos.y
         np.subtract(self.bodyPos, self.aRes, out=self.aVec)
@@ -208,11 +221,11 @@ class SurfaceOrbit(ObjectPath):
                 y=self.circle.center.y,
                 r=self.circle.radius,
                 a=self.pAngle)
-        
-        
-    
+   
+
 class TrajectoryState:
     """Helper class for calculating trajectories"""
+    
     def __init__(self, time, seg):
         self.fill(time, seg)
         
@@ -233,24 +246,24 @@ class Trajectory(ObjectPath):
         @pos             initial position
         @velocity        velocity vector
         @universe        the universe we move in
+        @onHit           function to call when we hit something
+        @onOutofRect     function to call when we move out of universe rect
         @max_len         maximum length of trajectory
         @max_err         maximum error of trajectory
         
     So how does this work?
         
-    *) We approximate the curve of the trajectory by a polygon. At each point,
-       we add the combined gravity vector of all objects in the universe
-       to the current velocity: this is our new velocity vector.
-       Then we multiply that vector by a small amount (dt), which gives us
-       the next point of the trajectory. And so on, until we hit a planet
-       or move outside the universe frame.
+    *) We approximate the curve of the trajectory by a polygon. 
+       Roughly speaking, we add the combined gravity vector of all objects 
+       in the universe to the current velocity: this is our new velocity 
+       vector. Then we move the object a small amount (dt) in that direction.
+       We do this until we hit a planet or move outside the universe frame.
            
     *) How do we choose dt?
-       1) We could use a fixed value.
-          This is simple but not very efficient / accurate.
-              
-       2) We can adapt dt to the curvature of the trajectory.
-          This is what we try to do here.
+       Instead of using some fixed value, we use an adaptive algoritm to
+       take the trajectory curvature into account.
+       
+       For details see the documentation of .calculateSegment().
     """
     
     def __init__(self,
@@ -416,9 +429,10 @@ class Trajectory(ObjectPath):
         while state.time < targetTime:
             # run out of buffer space?
             if len(self.time) == len(self.timeBuffer):
+                log('Trajectory', 'Ran out of buffer space!')
                 return False
             
-            seg_err = self.calculate_segment(state)
+            seg_err = self.calculateSegment(state)
             
             # moved out of universe frame?
             if  state.pos not in self.universe.rect:
@@ -469,7 +483,7 @@ class Trajectory(ObjectPath):
         """Calculates the area of the parallelogram spanned by the two vectors"""
         return np.abs(force.x*velocity.y - force.y*velocity.x)
         
-    def calculate_segment(self, state):
+    def calculateSegment(self, state):
         """Calculate one segment of the trajectory
         
             @state       Trajectory state
@@ -480,10 +494,11 @@ class Trajectory(ObjectPath):
         compute new position and velocity after a small amount of time.
         
         Here we combine two strategies:
+            
         1) Instead of adding the gravitational acceleration to the 
            velocity directly, we guess a value for the time delta (dt) and
            compute the gravitation at the point where the particle
-           would be after that time. Then we take the average of the
+           *would be* after that time. Then we take the average of the
            current and the would-be gravitational force, multiply it
            by dt and add it to the velocity vector.
            
@@ -492,7 +507,6 @@ class Trajectory(ObjectPath):
            Another option would be to use the "Runge-Kutta" method,
            which is more accurate but slightly more complex.
 
-           
         2) We use an adaptive algorithm for determining the value of dt.
            The more the trajectory is curved, the smaller dt needs to be.
            A good error measure is the area of the triangle that is
@@ -502,29 +516,25 @@ class Trajectory(ObjectPath):
            Also, this is especially easy to compute.
         
         """
+        
         gravityAt = self.universe.gravityVector
         seg_len = 0
         seg_err = 0
         
         # Take a first guess for a sensible dt value
-        dt = self.min_seg_calc/state.velocity.norm()
-        gv = self.tmpVec1
-        aGrav = self.tmpVec2
-        nPos = self.tmpVec3
-        dVel = self.tmpVec4
+        dt = self.min_seg_calc/state.velocity.abs()
+        gv = self.tmpVec1      # gravitational force at current position
+        nPos = self.tmpVec2    # next position
+        aGrav = self.tmpVec3   # gravitational forct at next position
+        dVel = self.tmpVec4    # delta of velocity vector
         while seg_len < self.min_seg_len:
             gravityAt(state.pos, gv)
-            #log('calculate_segment', '({s.x},{s.y}): gravity ({g.x}, {g.y}), v = {v}'.format(s=state.pos, g=gv, v=gv.norm()))
-            
             # Need to be initialized here
-            # aGrav = None    # average gravity current, next point
-            # dGrav = None    # gravitational acceleration
-            # dMove = None    # movement of particle
-            ndt = dt
-            dmx = 0
-            dmy = 0
-            dml = 0
-            err = 0
+            ndt = dt      # next try for dt
+            dmx = 0       # x component of delta of movement vector
+            dmy = 0       # y component ---"---
+            dml = 0       # length      ---"--
+            err = 0       # estimated error of approximation
             
             # Adjust ndt to reduce approximation error
             while True:
@@ -546,7 +556,6 @@ class Trajectory(ObjectPath):
                 err = self.vError(aGrav, dVel)
                 if err < self.max_err:
                     break
-                #if dMove.norm() < self.min_seg_calc:
                 dml = np.hypot(dmx, dmy)
                 if dml < self.min_seg_calc:
                     break
@@ -554,11 +563,9 @@ class Trajectory(ObjectPath):
             
             state.velocity.x += aGrav.x
             state.velocity.y += aGrav.y
-            #state.pos += dMove
             state.pos.x += dmx
             state.pos.y += dmy
             state.time += ndt
-            # seg_len += dMove.norm()
             seg_len += dml
             seg_err += err
             
