@@ -2,11 +2,16 @@
 
 import time
 import tkinter as tk
+import numpy as np
+import matplotlib as mpl
+from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+import PIL
+from PIL.ImageTk import PhotoImage as tkPhotoImage
+import tempfile
 from util import log
 from config import Config
 from game import Game
-from geometry import Point, Circle, Rect
-
+from geometry import Point, Circle
 
 
 class Container:
@@ -60,8 +65,11 @@ def sliderRow(frame, **desc):
 
     text = desc.get('text', '')
     del desc['text']
-    desc['length'] = Config.sliderWidth
-    desc['orient'] = tk.HORIZONTAL
+    if 'length' not in desc:
+        desc['length'] = Config.sliderWidth
+    if 'orient' not in desc:
+        desc['orient'] = tk.HORIZONTAL
+
     slider = tk.Scale(frame, **desc)
     label = tk.Label(frame, text=text)
     return (label, slider)
@@ -139,52 +147,8 @@ class Sliders(Container):
             slider.grid(row=i, column=1)
 
 
-class ControlArea(Container):
-    """Area for widgets controling the ship
-
-        @parent      parent container
-    """
-
-    def __init__(self, parent):
-        Container.__init__(self, parent)
-        self.frame.configure(borderwidth=2, pady=10)
-        self.launchButton = tk.Button(self.frame,
-                                      text='Launch',
-                                      command=self.app.cmd_launchShip,
-                                      bg=Config.colors['launchButton'].tkString())
-        self.thrustSliderRow = sliderRow(
-                self.frame,
-                variable=self.app.s_shipThrust,
-                from_=-Config.thrustScale,
-                to=Config.thrustScale,
-                text='Thrust',
-                resolution=0.1)
-        self.animationSliderRow = sliderRow(
-                self.frame,
-                variable=self.app.s_animationSpeed,
-                text='Animation speed',
-                from_=-Config.timeScale,
-                to=Config.timeScale,
-                resolution=0.1,
-                command=self.updateAnimationSpeed)
-
-    def updateAnimationSpeed(self, s):
-        ns = Config.scaleFunc(Config.timeFactor, float(s))
-        self.app.gameTimeFactor = ns
-        # log('Control', 'Changed animation speed to ' + str(ns))
-
-    def layout(self):
-        label, slider = self.animationSliderRow
-        label.grid(row=0, column=0)
-        slider.grid(row=0, column=1)
-        label, slider = self.thrustSliderRow
-        label.grid(row=1, column=0)
-        slider.grid(row=1, column=1)
-        self.launchButton.grid(row=2, column=0, columnspan=2)
-
-
-class Buttons(Container):
-    """Buttons area
+class AppButtons(Container):
+    """Main control buttons for the app
 
         @parent     parent container
     """
@@ -195,8 +159,8 @@ class Buttons(Container):
         self.playButton = tk.Button(self.frame, text='New Game', command=self.app.startGame)
 
     def layout(self):
-        self.playButton.grid(row=1,column=0)
-        self.quitButton.grid(row=1,column=1)
+        self.playButton.grid(row=1, column=0, pady=30)
+        self.quitButton.grid(row=1, column=1, pady=30, padx=20)
 
 
 class Clock(Container):
@@ -213,6 +177,7 @@ class Clock(Container):
                               width=18,
                               text=self.fmtString.format(0, 0, 0, 0),
                               bg=Config.colors['clockBackground'].tkString())
+        self.app.components.Clock = self
 
     def layout(self):
         self.label.grid()
@@ -237,12 +202,10 @@ class Controls(Container):
     def __init__(self, parent, app):
         Container.__init__(self, parent)
         self.sliders = Sliders(self)
-        self.launcher = ControlArea(self)
-        self.buttons = Buttons(self)
+        self.buttons = AppButtons(self)
 
     def layout(self):
         self.sliders.position(0, 0)
-        self.launcher.position(1, 0)
         self.buttons.position(2, 0)
 
 
@@ -252,9 +215,10 @@ class Display(Container):
         @parent     parent container
     """
 
-    def __init__(self, parent):
+    def __init__(self, parent, universe):
         Container.__init__(self, parent)
 
+        self.universe = universe
         uniRect = Config.uniRect
         # factors to translate universe coordinates to canvas cordinates and back
         self.u2c = Config.canvasWidth / uniRect.width()
@@ -266,8 +230,11 @@ class Display(Container):
                                 width=self.cWidth,
                                 height=self.cHeight,
                                 bg=self.cColor)
-        self.bodyViews = []
-        self.shipView = None
+        self.heatmapFile = tempfile.TemporaryFile()
+        self.vectorFile = tempfile.TemporaryFile()
+
+        self.reset(universe)
+        self.app.components.display = self
 
     def uni2canvas(self, up, cp):
         cp.x = up.x*self.u2c
@@ -279,20 +246,110 @@ class Display(Container):
         up.y = (self.cHeight - cp.y)*self.c2u
         return up
 
-    def reset(self, bodies):
+    def reset(self, universe):
         for id in self.canvas.find_all():
             self.canvas.delete(id)
-
+        self.universe = universe
         self.bodyViews = []
         self.shipView = None
-        self.createViews()
 
-    def createViews(self):
-        self.createBodyViews()
-        self.createShipView()
+        if universe is not None:
+            self.createBackgroundImages()
+            self.createBodyViews()
+            self.createShipView()
+
+    def createMatplotlibAxes(self,
+                             axes=None,
+                             width=Config.canvasWidth,
+                             height=Config.canvasHeight):
+        if axes is None:
+            axes = [0., 0., 1., 1.]
+        # This is a bit tricky / ugly.
+        # matplotlib does not allow us to specify exact pixel values.
+        # So we need to use a hack here.
+        fig = mpl.figure.Figure(frameon=False)
+        DPI = float(fig.get_dpi())
+
+        fCanvas = FigureCanvas(fig)
+        fig.set_size_inches(width/DPI, height/DPI)
+
+        # We don't want any axes drawn, of course.
+        ax = fig.add_axes(axes)
+        ax.set_axis_off()
+        return (ax, fCanvas, DPI)
+
+    def createBackgroundImages(self):
+        # Use logarithmic scale here, otherwise we don't get a useful
+        # picture.
+        realGravMatrix = self.universe.gravityMatrix
+        gravLogValues = np.log(realGravMatrix)
+        d = gravLogValues / realGravMatrix
+        gravLogVectors = self.universe.gravityVectorMatrix.copy()
+        gravLogVectors[:,:,0] *= d
+        gravLogVectors[:,:,1] *= d
+
+        (ax, fCanvas, DPI) = self.createMatplotlibAxes()
+
+        # cmap sets the used (predefined) colormap
+        ax.matshow(gravLogValues, cmap='inferno', interpolation='bicubic')
+
+        # Overwrite image from previous game
+        self.heatmapFile.seek(0)
+
+        # This seems to be the only way to get an exact pixel count:
+        # Save the image to a file and specify dpi to use.
+        fCanvas.print_figure(self.heatmapFile, dpi=DPI)
+        img = PIL.Image.open(self.heatmapFile)
+
+        # Flip image, because canvas y-coordinates increase downwards...
+        img = img.transpose(PIL.Image.FLIP_TOP_BOTTOM)
+
+        # Ths is important:
+        # 1) We need to use PIL.ImageTk.PhotoImage to make Tkinter happy
+        # 2) We need to keep a reference to the image, otherwise it will
+        #    disappear immediately.
+        self._gravityImage = tkPhotoImage(img)
+
+        # Tkinter's default anchor is the middle of the image
+        if self.app.toggleShowGravity.get() == 1:
+            gravState = tk.NORMAL
+        else:
+            gravState = tk.HIDDEN
+        self.gravityImage = self.canvas.create_image(self.cWidth/2,
+                                                self.cHeight/2,
+                                                image=self._gravityImage,
+                                                state=gravState)
+        # Now the vector field
+
+        sx = Config.canvasWidth
+        sy = Config.canvasHeight
+        zx = sx*1.1
+        zy = sy*1.1
+        dx = zx - sx
+        dy = zy - sy
+        (ax, fCanvas, DPI) = self.createMatplotlibAxes(width=zx, height=zy)
+        ax.quiver(self.universe.gravVectorGridX,
+                  self.universe.gravVectorGridY,
+                  gravLogVectors[:,:,0],
+                  gravLogVectors[:,:,1],
+                  angles='xy',
+                  color='r')
+        self.vectorFile.seek(0)
+        fCanvas.print_figure(self.vectorFile, dpi=DPI)
+        img = PIL.Image.open(self.vectorFile)
+        img = img.crop((dx/2, dy/2, zx - dx/2, zy - dy/2))
+        self._vectorImage = tkPhotoImage(img)
+        if self.app.toggleShowVectors.get() == 1:
+            vecState = tk.NORMAL
+        else:
+            vecState = tk.HIDDEN
+        self.vectorImage = self.canvas.create_image(self.cWidth/2,
+                                                    self.cHeight/2,
+                                                    image=self._vectorImage,
+                                                    state=vecState)
 
     def createBodyViews(self):
-        bodies = self.app.game.universe.bodies
+        bodies = self.universe.bodies
 
         def createView(body, col):
             bv = BodyView(body, Config.colors[col], self.uni2canvas, self.u2c)
@@ -315,10 +372,11 @@ class Display(Container):
     def layout(self):
         self.canvas.grid()
 
-    def update(self, gt):
+    def update(self, gt, polePoints):
+        for i, bv in enumerate(self.bodyViews):
+            bv.update(self.canvas, polePoints[i])
+
         self.shipView.update(self.canvas, gt)
-        for bv in self.bodyViews:
-            bv.update(self.canvas, gt)
 
 
 class BodyView:
@@ -347,24 +405,23 @@ class BodyView:
                                      c.center.y + c.radius,
                                      fill=self.col.tkString(),
                                      outline=Config.colors['planetOutline'].tkString())
-        rp = c.pointAtAngle(0)
-        self.rotID = canvas.create_line(c.center.x,
-                                        c.center.y,
-                                        rp.x,
-                                        rp.y,
+        c = self.circle.center
+        r = self.circle.radius
+        self.rotID = canvas.create_line(c.x,
+                                        c.y,
+                                        c.x,
+                                        c.y - r,
                                         width=2,
                                         fill=Config.colors['planetRotor'].tkString())
 
-    def update(self, canvas, gt):
-        a = self.body.bodyAngleAt(gt)
-        c = self.circle
-        p = c.pointAtAngle(a)
-        p.y = 2*c.center.y - p.y  # because we use screen coordinates
+    def update(self, canvas, polePoint):
+        c = self.circle.center
+        r = self.circle.radius
         canvas.coords(self.rotID,
-                      c.center.x,
-                      c.center.y,
-                      p.x,
-                      p.y)
+                      c.x,
+                      c.y,
+                      c.x + r*polePoint[0],
+                      c.y - r*polePoint[1])
 
 
 class ShipView:
@@ -385,29 +442,185 @@ class ShipView:
         self.offset = size/2
         self.bufPoint = Point(0, 0)
 
-    def getRect(self, gt):
-        p = self.u2c(self.ship.positionAt(gt), self.bufPoint)
-        return Rect(p.x - self.offset,
-                    p.y - self.offset,
-                    p.x + self.offset,
-                    p.y + self.offset)
-
     def draw(self, canvas):
-        r = self.getRect(0)
-        self.id = canvas.create_oval(r.xmin,
-                                     r.ymin,
-                                     r.xmax,
-                                     r.ymax,
+        p = self.u2c(self.ship.positionAt(0), self.bufPoint)
+        off = self.offset
+        self.id = canvas.create_oval(p.x - off,
+                                     p.y - off,
+                                     p.x + off,
+                                     p.y + off,
                                      fill=Config.colors['ship'].tkString(),
                                      outline=Config.colors['shipOutline'].tkString())
 
     def update(self, canvas, gt):
-        r = self.getRect(gt)
+        p = self.u2c(self.ship.positionAt(gt), self.bufPoint)
+        off = self.offset
         canvas.coords(self.id,
-                      r.xmin,
-                      r.ymin,
-                      r.xmax,
-                      r.ymax)
+                      p.x - off,
+                      p.y - off,
+                      p.x + off,
+                      p.y + off)
+
+
+class BottomFrame(Container):
+    """Bottom area under universe display"""
+
+    def __init__(self, parent):
+        Container.__init__(self, parent)
+
+        self.clock = Clock(self)
+        self.showGravLabel = tk.Label(self.frame, text='Show gravity')
+        self.showVectorsLabel = tk.Label(self.frame, text='Show vectors')
+
+        self.showGravButton = self.radioButton(self.app.toggleShowGravity,
+                                               1,
+                                               'On',
+                                               self.onShowGravity)
+        self.hideGravButton = self.radioButton(self.app.toggleShowGravity,
+                                              0,
+                                              'Off',
+                                              self.onHideGravity)
+        self.showVectorsButton = self.radioButton(self.app.toggleShowVectors,
+                                               1,
+                                               'On',
+                                               self.onShowVectors)
+        self.hideVectorsButton = self.radioButton(self.app.toggleShowVectors,
+                                              0,
+                                              'Off',
+                                              self.onHideVectors)
+
+        self.launchButton = tk.Button(self.frame,
+                                      text='Launch',
+                                      command=self.app.cmd_launchShip,
+                                      bg=Config.colors['launchButton'].tkString())
+
+        (self.thrustSliderLabel, self.thrustSlider) = sliderRow(
+                self.frame,
+                variable=self.app.s_shipThrust,
+                from_=-Config.thrustScale,
+                to=Config.thrustScale,
+                text='Thrust',
+                resolution=0.1,
+                length=Config.sliderWidth*1.5)
+
+        (self.animationSliderLabel, self.animationSlider) = sliderRow(
+                self.frame,
+                variable=self.app.s_animationSpeed,
+                text='Animation speed',
+                from_=-Config.timeScale,
+                to=Config.timeScale,
+                resolution=0.1,
+                command=self.updateAnimationSpeed,
+                length=Config.sliderWidth*2)
+
+        self.zoomWindowWidth = Config.zoomWindowWidth
+        self.zoomWindowHeight = Config.zoomWindowHeight
+        self.zoomWindow = tk.Canvas(self.frame,
+                                    width=self.zoomWindowWidth,
+                                    height=self.zoomWindowHeight,
+                                    bg=Config.colors['zoomWindowBackground'].tkString())
+
+        self.zoomCenterX = int(self.zoomWindowWidth/2)
+        self.zoomCenterY = int(self.zoomWindowHeight/2)
+        self.zoomArrowLen = self.zoomWindowHeight*0.45
+
+        r = self.zoomWindowHeight*0.35
+        self.zoomPlanet = self.zoomWindow.create_oval(
+                self.zoomCenterX - r,
+                self.zoomCenterY - r,
+                self.zoomCenterX + r,
+                self.zoomCenterY + r,
+                width=Config.zoomCircleLineWidth,
+                outline=Config.colors['zoomOutline'].tkString())
+
+        self.zoomArrow = self.zoomWindow.create_line(
+                self.zoomCenterX,
+                self.zoomCenterY,
+                self.zoomCenterX,
+                self.zoomCenterY - self.zoomArrowLen,
+                arrow=tk.LAST,
+                arrowshape=Config.zoomArrowShape,
+                width=Config.zoomArrowWidth,
+                fill=Config.colors['zoomOutline'].tkString())
+
+        self.showZoom = True
+        self.zoomIsHidden = False
+        self.app.components.BottomFrame = self
+
+    def radioButton(self, var, value, text, cmd):
+        return tk.Radiobutton(self.frame,
+                              indicatoron=0,
+                              value=value,
+                              variable=var,
+                              text=text,
+                              width=4,
+                              height=2,
+                              command=cmd)
+
+    def layout(self):
+        self.showGravLabel.grid(row=0, column=0, sticky=tk.E)
+        self.showGravButton.grid(row=0, column=1)
+        self.hideGravButton.grid(row=0, column=2)
+
+        self.showVectorsLabel.grid(row=1, column=0, sticky=tk.E)
+        self.showVectorsButton.grid(row=1, column=1)
+        self.hideVectorsButton.grid(row=1, column=2)
+
+        self.animationSliderLabel.grid(row=0, column=3, sticky=tk.E)
+        self.animationSlider.grid(row=0, column=4, columnspan=2, sticky=tk.W)
+
+        self.thrustSliderLabel.grid(row=1, column=3, sticky=tk.E)
+        self.thrustSlider.grid(row=1, column=4, sticky=tk.W)
+
+        self.launchButton.grid(row=1, column=5, padx=15)
+
+        self.clock.position(0, 6)
+
+        self.zoomWindow.grid(row=0, column=7, rowspan=2, sticky=tk.E)
+
+    def display(self): return self.app.components.display
+
+    def onShowGravity(self):
+        display = self.display()
+        display.canvas.itemconfigure(display.gravityImage, state=tk.NORMAL)
+
+    def onHideGravity(self):
+        display = self.display()
+        display.canvas.itemconfigure(display.gravityImage, state=tk.HIDDEN)
+
+    def onShowVectors(self):
+        display = self.display()
+        display.canvas.itemconfigure(display.vectorImage, state=tk.NORMAL)
+
+    def onHideVectors(self):
+        display = self.display()
+        display.canvas.itemconfigure(display.vectorImage, state=tk.HIDDEN)
+
+    def updateAnimationSpeed(self, s):
+        ns = Config.scaleFunc(Config.timeFactor, float(s))
+        self.app.gameTimeFactor = ns
+
+    def update(self, gt, orbit):
+        if orbit is None:
+            if not self.zoomIsHidden:
+                for id in self.zoomWindow.find_all():
+                    self.zoomWindow.itemconfigure(id, state=tk.HIDDEN)
+                self.zoomIsHidden = True
+            return
+
+        angle = orbit.yAngleAt(gt)
+        angle = np.pi/2 - angle
+        nx = np.cos(angle) * self.zoomArrowLen
+        ny = np.sin(angle) * self.zoomArrowLen
+        self.zoomWindow.coords(self.zoomArrow,
+                               self.zoomCenterX,
+                               self.zoomCenterY,
+                               self.zoomCenterX + nx,
+                               self.zoomCenterY - ny)
+        if self.zoomIsHidden:
+            for id in self.zoomWindow.find_all():
+                self.zoomWindow.itemconfigure(id, state=tk.NORMAL)
+        self.zoomIsHidden = False
 
 
 class MainFrame(Container):
@@ -418,10 +631,12 @@ class MainFrame(Container):
 
     def __init__(self, parent):
         Container.__init__(self, parent)
-        self.display = Display(self)
+        self.display = Display(self, None)
+        self.bottomFrame = BottomFrame(self)
 
     def layout(self):
         self.display.position(0, 0)
+        self.bottomFrame.position(1, 0)
 
 
 class SideFrame(Container):
@@ -431,12 +646,14 @@ class SideFrame(Container):
     """
     def __init__(self, parent):
         Container.__init__(self, parent)
-        self.clock = Clock(self)
         self.controls = Controls(self, self)
 
     def layout(self):
-        self.clock.position(0, 0)
         self.controls.position(1, 0)
+
+# Dummy class
+class Components:
+    pass
 
 
 class App(Container):
@@ -451,6 +668,10 @@ class App(Container):
         self.app = self
         self.game = None
         self.frame.master.title(Config.windowTitle)
+
+        # Simple registry for widgets / containers
+        self.components = Components()
+
         self.settingVariables = {
                 's_planetSize': tk.DoubleVar(),
                 's_planetDensity': tk.DoubleVar(),
@@ -471,6 +692,12 @@ class App(Container):
         self.s_animationSpeed = tk.DoubleVar()
         self.s_animationSpeed.set(0)
 
+        self.toggleShowGravity = tk.IntVar()
+        self.toggleShowGravity.set(0)
+
+        self.toggleShowVectors = tk.IntVar()
+        self.toggleShowVectors.set(0)
+
         # Widgets
         self.mainFrame = MainFrame(self)
         self.sideFrame = SideFrame(self)
@@ -478,7 +705,8 @@ class App(Container):
         self.animating = False
 
         self.updateDisplay = self.mainFrame.display.update
-        self.updateClock = self.sideFrame.clock.update
+        self.updateClock = self.components.Clock.update
+        self.updateZoom = self.components.BottomFrame.update
 
         self.shouldUpdate = Config.updateIntervalFast      # in ms
         self.shouldUpdateSlow = Config.updateIntervalSlow  # in ms
@@ -520,7 +748,7 @@ class App(Container):
             self.settings.set(k, var.get())
         self.game = Game(self.settings)
         self.game.build()
-        self.mainFrame.display.reset(self.game.universe.bodies)
+        self.mainFrame.display.reset(self.game.universe)
         self.lastGameTime = 0
         self.game.start()
         self.animating = True
@@ -535,7 +763,9 @@ class App(Container):
         if self.game is not None and self.animating:
             gt = self.gameTime(t)
             self.game.update(gt)
-            self.updateDisplay(gt)
+            polePoints = self.game.polePointsAt(gt)
+            self.updateDisplay(gt, polePoints)
+            self.components.BottomFrame.update(gt, self.game.ship.orbit())
 
         self.lastUpdate = t
         self.nUpdates +=1
@@ -558,10 +788,11 @@ class App(Container):
         self.frame.after(self.shouldUpdateSlow, self.updateSlow)
 
     def cmd_launchShip(self):
-        planet = self.game.ship.planet
+        orbit = self.game.ship.orbit()
         # Check if the ship is landed on a planet
-        if planet is None:
+        if orbit is None:
             return
+        planet = orbit.body
         t = self.realTime()
         gt = self.gameTime(t)
         ev = planet.escapeSpeed(self.game.universe.gravity)

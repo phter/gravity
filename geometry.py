@@ -191,6 +191,9 @@ class Rect:
     def height(self):
         return self.ymax - self.ymin
 
+    def hwRatio(self):
+        return (self.ymax - self.ymin)/(self.xmax - self.xmin)
+
     def __str__(self):
         return 'Rect({},{},{},{})'.format(
                 self.xmin, self.ymin, self.xmax, self.ymax)
@@ -224,6 +227,7 @@ class Circle:
         """Return angle between y-axis and line MP
 
         a increases clockwise
+        c.polarAngleTo(c.pointAtAngle(a)) == a (+ 2k Pi)
         """
 
         # careful, y component comes first here

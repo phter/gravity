@@ -2,9 +2,12 @@ Benutzte Bibliotheken:
 
 math       - obviously
 random     - to generate random planet positions
+tempfile   - to store background images
 time       - to get accurate clock information
 tkinter    - GUI
 numpy      - to store trajectories in compact arrays
+matplotlib - to create gravity visualization
+PIL        - to transform images / make matplotlib play nice with Tkinter
 
 
 
