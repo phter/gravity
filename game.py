@@ -50,11 +50,13 @@ class Planet(Body):
 
 class Ship:
     """Our space ship - yay!"""
-    def __init__(self, body, angle, universe):
+    def __init__(self, body, angle, universe, gameVariables):
+        self.gameVariables = gameVariables
         self.universe = universe
         self.usedFuel = 0
         self.nLaunches = 0     # how many landings on a planet
         self.nLost = 0         # how often flown outside of universe rectangle
+        self.flightLength = 0
         self.paths = [body.orbit(0, angle)]
 
     def orbit(self):
@@ -67,8 +69,10 @@ class Ship:
         pass
 
     def land(self, t, planet, yAngle):
+        self.updateFlightLength()
         orbit = planet.orbit(t, yAngle)
         self.paths.append(orbit)
+
         log('Ship', 'Landed on {}\nTime {}\nyAngle {}'.format(planet, t, yAngle))
         log('Ship', 'Orbit yAngle {}'.format(orbit.yAngleAt(t)))
 
@@ -93,15 +97,25 @@ class Ship:
                           onOutOfRect=self.onOutOfUniverse)
         self.paths.append(traj)
         self.nLaunches += 1
+        self.usedFuel += thrust
+        self.gameVariables.nLaunches = self.nLaunches
+        self.gameVariables.usedFuel = self.usedFuel
         log('Ship', 'Launched at {}\nVelocity: {}\nStart orbit: {}'.format(t, v, orbit.body))
 
     def onHitBody(self, t, body, yAngle):
         self.land(t, body, yAngle)
 
     def onOutOfUniverse(self, t, pos):
-        self.nLost += 1
         self.paths.pop()
+        # Don't count fligth of lost ships
+        self.updateFlightLength()
+        self.nLost += 1
+        self.gameVariables.nLostShips = self.nLost
         log('Ship', 'Moved out of visible universe at time {}'.format(t))
+
+    def updateFlightLength(self):
+        self.flightLength = sum(path.length() for path in self.paths if isinstance(path, Trajectory))
+        self.gameVariables.flightLength = self.flightLength
 
     def positionAt(self, t):
         # Fast path
@@ -145,6 +159,7 @@ class Game:
         self.startPlanet = None     # planet where ship starts
         self.targetPlanet = None    # planet where we want to go to
         self.ship = None
+        self.gameVariables = None   # In-game variables displayed in GUI
         self.startTime = 0
         self.endTime = np.Inf       # game time when game ended
         self.lastUpdate = 0         # game time of last update
@@ -164,7 +179,8 @@ class Game:
                                     count=settings.nLargePlanets)
         }
 
-    def build(self):
+    def build(self, gameVariables):
+        self.gameVariables = gameVariables
         log('Game', 'Building new game')
         log('Game', 'Creating planets')
         pg = PlanetGenerator(self.planetTypes, self.settings)
@@ -173,7 +189,7 @@ class Game:
         self.startPlanet = pg.startPlanet
         self.targetPlanet = pg.targetPlanet
         log('Game', 'Creating ship')
-        self.ship = Ship(self.startPlanet, 0, self.universe)
+        self.ship = Ship(self.startPlanet, 0, self.universe, self.gameVariables)
 
         self.aRotations = np.array([body.rotation for body in self.universe.bodies])
         self.aPoles = np.array([[0, 1]] * len(self.aRotations), dtype=np.double)

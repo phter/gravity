@@ -23,7 +23,7 @@ ph: Prototyp für Spiel (4)
 ph: GUI: - Design der Klassen
          - Grundlegendes Layout
          - Dokumentation             (8)
-         
+
 20.5:
 ph: Konfiguration planen und erstellen (3)
 
@@ -35,9 +35,11 @@ ph: Geometrie Bibliothek (4)
 
 27.5:
 ph: Rotation der Planeten, Dokumentation (4)
+jan: Stoppuhr (3)
 
 28.5:
 ph: Utility Bibliothek (1)
+jan: Stoppuhr (2)
 
 29.5:
 bab, jan, ph: Spieldesign, Steuerung (2)
@@ -67,7 +69,19 @@ ph: Berechnung der Flugbahn, Dokumentation, Clean-up (4)
 10.6:
 ph: Berechnung des Landepunktes (2)
 
+12.6:
+jan: Einstellungen einlesen/auslesen, Labels mit zusätzlicher Info (5)
 
+14.6:
+ph: Visualisierung Gravitationsfeld (4)
+jan: Labels mit zusätzlicher Info (3)
+
+15.6:
+ph: Visualisierung Gravitationsvektoren (2)
+
+16.06:
+jan: Einstellungen einlesen/auslesen (5)
+ph: Fluglaengenberechnung/Fehlersuche (2)
 
 
 

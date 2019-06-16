@@ -98,7 +98,8 @@ class Config:
             'shipOutlineColor': Color(224, 16, 16),
 
             'launchButton': Color(192, 32, 32),
-            'clockBackground': Color(230, 230, 230),
+            'clockBackground': Color(255, 235, 235),
+            'ValueLabelBackground': Color(245, 245, 245),
 
             'startPlanet': Color(16, 200, 200),
             'targetPlanet': Color(16, 220, 48),
@@ -185,9 +186,9 @@ settingVars = {
         # Scaling values
         's_planetSize': (-5, 5, 0),
         's_planetDensity': (-5, 5, 0),
-        's_planetRotation': (-15, 15, 0),
+        's_planetRotation': (-10, 10, 0),
         's_gravityConstant': (-5, 5, 0),
-        's_animationSpeed': (-5, 5, 0),
+        's_animationSpeed': (-3, 3, 0),
 
         # Absolute values
         'planetSpread': (1, 4, 2),

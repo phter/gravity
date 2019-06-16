@@ -87,7 +87,9 @@ class Universe:
         self.bodies = bodies
         self.gravity = gravity
         self.bodyIndexes = range(len(self.bodies))
+        log('Universe', 'Creating numpy arrays')
         self.createArrays()
+        log('Universe', 'Creating matrices')
         self.createGravityMatrix(Config.gravityGridRows,
                                 Config.gravityGridCols)
 
@@ -375,6 +377,9 @@ class Trajectory(ObjectPath):
                 vx=seg[2],
                 vy=seg[3])
 
+    def length(self):
+        return self.segments[-1,4]
+
     def logTrajectory(self):
         s = """Start time: {st}
         End time: {et}
@@ -482,8 +487,12 @@ class Trajectory(ObjectPath):
 
             body = self.universe.containingBody(state.pos)
             if body is not None:
-                d = self.calculateLandingSegment(body, state, lState)
+                (d, yAngle) = self.calculateLandingSegment(body, state, lState)
                 self.cumError += seg_err*d
+                self.addState(state)
+                self.endTime = state.time
+                self.logTrajectory()
+                self.onHit(state.time, body, yAngle)
                 return state.time > targetTime
 
             self.addState(state)
@@ -509,11 +518,7 @@ class Trajectory(ObjectPath):
         # Since we landed, velocity is zero
         state.velocity = Vector(0, 0)
         state.length = lState.length + (state.length - lState.length)*d
-        self.addState(state)
-        self.endTime = state.time
-        self.logTrajectory()
-        self.onHit(state.time, body, yAngle)
-        return d
+        return (d, yAngle)
 
     def vError(self, force, velocity):
         """Calculates the area of the parallelogram spanned by the two vectors"""

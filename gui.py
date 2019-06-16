@@ -143,7 +143,7 @@ class Sliders(Container):
 
     def layout(self):
         for i, (label, slider) in enumerate(self.sliders):
-            label.grid(row=i, column=0)
+            label.grid(row=i, column=0, sticky=tk.E)
             slider.grid(row=i, column=1)
 
 
@@ -254,8 +254,11 @@ class Display(Container):
         self.shipView = None
 
         if universe is not None:
+            log('Display', 'Creating background images')
             self.createBackgroundImages()
+            log('Display', 'Creating body views')
             self.createBodyViews()
+            log('Display', 'Creating ship view')
             self.createShipView()
 
     def createMatplotlibAxes(self,
@@ -279,6 +282,7 @@ class Display(Container):
         return (ax, fCanvas, DPI)
 
     def createBackgroundImages(self):
+        log('Display', 'Creating gravity heatmap')
         # Use logarithmic scale here, otherwise we don't get a useful
         # picture.
         realGravMatrix = self.universe.gravityMatrix
@@ -320,7 +324,7 @@ class Display(Container):
                                                 image=self._gravityImage,
                                                 state=gravState)
         # Now the vector field
-
+        log('Display', 'Creating Vector field image')
         sx = Config.canvasWidth
         sy = Config.canvasHeight
         zx = sx*1.1
@@ -511,7 +515,19 @@ class BottomFrame(Container):
                 to=Config.timeScale,
                 resolution=0.1,
                 command=self.updateAnimationSpeed,
-                length=Config.sliderWidth*2)
+                length=Config.sliderWidth*1.5)
+
+        self.usedFuelText = self.makeTextLabel('Used fuel')
+        self.usedFuelLabel = self.makeValueLabel('usedFuel')
+
+        self.launchesText = self.makeTextLabel('Launches')
+        self.launchesLabel = self.makeValueLabel('nLaunches')
+
+        self.lostText = self.makeTextLabel('Lost ships')
+        self.lostLabel = self.makeValueLabel('nLostShips')
+
+        self.flightLengthText = self.makeTextLabel('Flight length')
+        self.flightLengthLabel = self.makeValueLabel('flightLength')
 
         self.zoomWindowWidth = Config.zoomWindowWidth
         self.zoomWindowHeight = Config.zoomWindowHeight
@@ -547,6 +563,14 @@ class BottomFrame(Container):
         self.zoomIsHidden = False
         self.app.components.BottomFrame = self
 
+    def makeTextLabel(self, text):
+        return tk.Label(self.frame, text=text)
+
+    def makeValueLabel(self, variable):
+        return tk.Label(self.frame, width=12,
+                        textvariable=self.app.textVariables[variable],
+                        bg=Config.colors['ValueLabelBackground'].tkString())
+
     def radioButton(self, var, value, text, cmd):
         return tk.Radiobutton(self.frame,
                               indicatoron=0,
@@ -558,25 +582,33 @@ class BottomFrame(Container):
                               command=cmd)
 
     def layout(self):
-        self.showGravLabel.grid(row=0, column=0, sticky=tk.E)
-        self.showGravButton.grid(row=0, column=1)
-        self.hideGravButton.grid(row=0, column=2)
+        self.showGravLabel.grid(row=0, column=0, rowspan=2, sticky=tk.E)
+        self.showGravButton.grid(row=0, column=1, rowspan=2)
+        self.hideGravButton.grid(row=0, column=2, rowspan=2)
 
-        self.showVectorsLabel.grid(row=1, column=0, sticky=tk.E)
-        self.showVectorsButton.grid(row=1, column=1)
-        self.hideVectorsButton.grid(row=1, column=2)
+        self.showVectorsLabel.grid(row=2, column=0, rowspan=2, sticky=tk.E)
+        self.showVectorsButton.grid(row=2, column=1, rowspan=2)
+        self.hideVectorsButton.grid(row=2, column=2, rowspan=2)
 
-        self.animationSliderLabel.grid(row=0, column=3, sticky=tk.E)
-        self.animationSlider.grid(row=0, column=4, columnspan=2, sticky=tk.W)
+        self.usedFuelText.grid(row=0, column=3)
+        self.usedFuelLabel.grid(row=0, column=4)
+        self.launchesText.grid(row=1, column=3)
+        self.launchesLabel.grid(row=1, column=4)
+        self.flightLengthText.grid(row=2, column=3)
+        self.flightLengthLabel.grid(row=2, column=4)
+        self.lostText.grid(row=3, column=3)
+        self.lostLabel.grid(row=3, column=4)
 
-        self.thrustSliderLabel.grid(row=1, column=3, sticky=tk.E)
-        self.thrustSlider.grid(row=1, column=4, sticky=tk.W)
+        self.animationSliderLabel.grid(row=0, column=5, rowspan=2, sticky=tk.E)
+        self.animationSlider.grid(row=0, column=6, rowspan=2, sticky=tk.W)
 
-        self.launchButton.grid(row=1, column=5, padx=15)
+        self.thrustSliderLabel.grid(row=2, column=5, rowspan=2, sticky=tk.E)
+        self.thrustSlider.grid(row=2, column=6, rowspan=2, sticky=tk.W)
 
-        self.clock.position(0, 6)
+        self.clock.position(0, 8)
+        self.launchButton.grid(row=2, column=8, padx=15, rowspan=2)
 
-        self.zoomWindow.grid(row=0, column=7, rowspan=2, sticky=tk.E)
+        self.zoomWindow.grid(row=0, column=9, rowspan=4, sticky=tk.E)
 
     def display(self): return self.app.components.display
 
@@ -651,6 +683,35 @@ class SideFrame(Container):
     def layout(self):
         self.controls.position(1, 0)
 
+
+class GameVariables:
+    """Acts as an interface between app and game classes"""
+
+    def __init__(self, app, game):
+        self.app = app
+        self.game = game
+        self.text = app.textVariables
+
+    @property
+    def usedFuel(self): return self.game.ship.usedFuel
+    @usedFuel.setter
+    def usedFuel(self, v): self.text['usedFuel'].set('{:.2f}'.format(v/1000))
+
+    @property
+    def nLaunches(self): return self.game.ship.nLaunches
+    @nLaunches.setter
+    def nLaunches(self, v): self.text['nLaunches'].set(str(v))
+
+    @property
+    def nLostShips(self): return self.game.ship.nLost
+    @nLostShips.setter
+    def nLostShips(self, v): self.text['nLostShips'].set(str(v))
+
+    @property
+    def flightLength(self): return self.game.ship.flightLength()
+    @flightLength.setter
+    def flightLength(self, v): self.text['flightLength'].set('{:.2f}'.format(v/1000))
+
 # Dummy class
 class Components:
     pass
@@ -667,6 +728,7 @@ class App(Container):
         self.settings = settings
         self.app = self
         self.game = None
+        self.gameVariables = None
         self.frame.master.title(Config.windowTitle)
 
         # Simple registry for widgets / containers
@@ -681,6 +743,14 @@ class App(Container):
                 'nSmallPlanets': tk.IntVar(),
                 'nNormalPlanets': tk.IntVar(),
                 'nLargePlanets': tk.IntVar()
+                }
+
+        self.textVariables = {
+                'usedFuel': tk.StringVar(),
+                'nLaunches': tk.StringVar(),
+                'nLostShips': tk.StringVar(),
+                'gameTime': tk.StringVar(),
+                'flightLength': tk.StringVar()
                 }
 
         for k, var in self.settingVariables.items():
@@ -746,10 +816,21 @@ class App(Container):
         for k, var in self.settingVariables.items():
             log('App', 'Setting {} to {}'.format(k, var.get()))
             self.settings.set(k, var.get())
+
+        log('App', 'Building new game')
         self.game = Game(self.settings)
-        self.game.build()
+        self.gameVariables = GameVariables(self, self.game)
+        self.game.build(self.gameVariables)
+
+        log('App', 'Creating views')
         self.mainFrame.display.reset(self.game.universe)
         self.lastGameTime = 0
+        self.textVariables['nLostShips'].set('0')
+        self.textVariables['nLaunches'].set('0')
+        self.textVariables['flightLength'].set('0')
+        self.textVariables['usedFuel'].set('0')
+        self.textVariables['gameTime'].set('00d 00h 00m 00s')
+
         self.game.start()
         self.animating = True
 
