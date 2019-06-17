@@ -3,7 +3,7 @@
 import time
 import tkinter as tk
 import numpy as np
-import matplotlib as mpl
+from matplotlib.figure import Figure as mplFigure
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 import PIL
 from PIL.ImageTk import PhotoImage as tkPhotoImage
@@ -270,7 +270,7 @@ class Display(Container):
         # This is a bit tricky / ugly.
         # matplotlib does not allow us to specify exact pixel values.
         # So we need to use a hack here.
-        fig = mpl.figure.Figure(frameon=False)
+        fig = mplFigure(frameon=False)
         DPI = float(fig.get_dpi())
 
         fCanvas = FigureCanvas(fig)
