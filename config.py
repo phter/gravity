@@ -20,9 +20,7 @@ class Config:
     """Global app configuration"""
 
     # Time (in ms) between updates of the GUI
-    updateIntervalFast = 75
-    # Time (in ms) between updates of less critical stuff (clock, etc.)
-    updateIntervalSlow = 1000
+    updateInterval = 75
 
     # Visible universe
     uniRect = Rect(0, 0, 4e8, 2.8e8)
@@ -49,12 +47,14 @@ class Config:
     planetRotation = phylib.earth.angularSpeed
     gravityConstant = phylib.GConst
 
+    # How many in-game seconds pass per second
+    timeFactor = 500
+
     # sets thrust range to [ev*1.3^-5, ev*1.3^5]
     # ev being the escape velocity of a planet
     thrustScale = 2.5
 
-    # How many in-game seconds pass per second
-    timeFactor = 500
+    # range for animation speed scale
     timeScale = 15
 
     # Gives us a smooth scaling function for positive values
@@ -109,8 +109,6 @@ class Config:
             'ship': Color(224, 224, 16),
             'shipOutline': Color(224, 16, 16)
             }
-
-
 
 
 class Settings:
@@ -200,8 +198,3 @@ settingVars = {
 for name, defn in settingVars.items():
     setattr(Settings, name, defn[2])
     setattr(Settings, name + 'Range', Interval(defn[0], defn[1]))
-
-
-
-
-

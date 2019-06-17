@@ -190,6 +190,7 @@ class Game:
         self.targetPlanet = pg.targetPlanet
         log('Game', 'Creating ship')
         self.ship = Ship(self.startPlanet, 0, self.universe, self.gameVariables)
+        self.updateShip = self.ship.update  # silly optimization
 
         self.aRotations = np.array([body.rotation for body in self.universe.bodies])
         self.aPoles = np.array([[0, 1]] * len(self.aRotations), dtype=np.double)
@@ -216,13 +217,20 @@ class Game:
             log('Game', 'Can not launch ship when not on planet')
 
     def update(self, gt):
-        self.ship.update(gt)
-        self.lastUpdate = gt
+        """Update game state
 
-    def polePointsAt(self, gt):
-        np.multiply(self.aRotations, gt, out=self.aRotBuf)
+        Returns an array of current pole vectors.
+        """
+
+        self.updateShip(gt)
+        self.lastUpdate = gt
+        return self.poleVectors(gt)
+
+    def poleVectors(self, gt):
+        """Return an array of the planet's pole vectors scaled to 1"""
         # Translate our definition of angle (clockwise starting at y-axis)
         # to the mathematical one (counterclockwise, starting at x-axis)
+        np.multiply(self.aRotations, gt, out=self.aRotBuf)
         np.subtract(self.aPi2, self.aRotBuf, out=self.aRotBuf)
         np.cos(self.aRotBuf, out=self.aPolesX)
         np.sin(self.aRotBuf, out=self.aPolesY)

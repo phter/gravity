@@ -173,9 +173,11 @@ class Clock(Container):
 
     def __init__(self, parent):
         Container.__init__(self, parent)
+
+        self.textVar = self.app.textVariables['gameTime']
         self.label = tk.Label(self.frame,
                               width=18,
-                              text=self.fmtString.format(0, 0, 0, 0),
+                              textvariable=self.textVar,
                               bg=Config.colors['clockBackground'].tkString())
         self.app.components.Clock = self
 
@@ -189,7 +191,7 @@ class Clock(Container):
         cm = m % 60
         ch = h % 24
         cd = h // 24
-        self.label.config(text=self.fmtString.format(cd, ch, cm, t % 60))
+        self.textVar.set(self.fmtString.format(cd, ch, cm, t % 60))
 
 
 class Controls(Container):
@@ -561,7 +563,7 @@ class BottomFrame(Container):
 
         self.showZoom = True
         self.zoomIsHidden = False
-        self.app.components.BottomFrame = self
+        self.app.components.updateZoom = self.update
 
     def makeTextLabel(self, text):
         return tk.Label(self.frame, text=text)
@@ -712,6 +714,7 @@ class GameVariables:
     @flightLength.setter
     def flightLength(self, v): self.text['flightLength'].set('{:.2f}'.format(v/1000))
 
+
 # Dummy class
 class Components:
     pass
@@ -756,6 +759,7 @@ class App(Container):
         for k, var in self.settingVariables.items():
             var.set(settings.get(k))
 
+        # TODO make container for this so it's clearer
         # Game control variables
         self.s_shipThrust = tk.DoubleVar()
         self.s_shipThrust.set(0)
@@ -776,34 +780,28 @@ class App(Container):
 
         self.updateDisplay = self.mainFrame.display.update
         self.updateClock = self.components.Clock.update
-        self.updateZoom = self.components.BottomFrame.update
+        self.updateZoom = self.components.updateZoom
+        self.realTime = time.perf_counter
 
-        self.shouldUpdate = Config.updateIntervalFast      # in ms
-        self.shouldUpdateSlow = Config.updateIntervalSlow  # in ms
+        self.shouldUpdate = Config.updateInterval          # in ms
         self.atLeastUpdate = self.shouldUpdate*1.15 / 1000 # in s
 
-        currentTime = self.realTime()
-        self.lastUpdate = currentTime
-        self.lastGameTime = 0
+        # How many game seconds pass in one real second
         self.gameTimeFactor = Config.timeFactor
 
-        self.nUpdateLags = 0
-        self.nUpdates = 0
-
-        self.lastUpdateSlow = currentTime
-
-        self.totalLag = 0
-        self.lastTotalLag = 0
-
+        self.resetGameCounters()
         # Should be last
-        self.updateFast()
-        self.updateSlow()
+        self.tick()
 
-    def realTime(self):
-        return time.perf_counter()
+    def resetGameCounters(self):
+        currentTime = self.realTime()
+        self.lastTime = currentTime             # last real time exact
+        self.lastSecond = int(currentTime)      # last real time second
+        self.lastGameTime = 0                   # in-game time, exact
+        self.lag = 0
 
     def gameTime(self, t):
-        gt = self.lastGameTime + (t - self.lastUpdate)*self.gameTimeFactor
+        gt = self.lastGameTime + (t - self.lastTime)*self.gameTimeFactor
         self.lastGameTime = gt
         return gt
 
@@ -824,7 +822,8 @@ class App(Container):
 
         log('App', 'Creating views')
         self.mainFrame.display.reset(self.game.universe)
-        self.lastGameTime = 0
+        self.resetGameCounters()
+
         self.textVariables['nLostShips'].set('0')
         self.textVariables['nLaunches'].set('0')
         self.textVariables['flightLength'].set('0')
@@ -834,39 +833,39 @@ class App(Container):
         self.game.start()
         self.animating = True
 
-    def updateFast(self):
+    def tick(self):
         t = self.realTime()
-        diff = t - self.lastUpdate
+        diff = t - self.lastTime
         if diff > self.atLeastUpdate:
-            self.totalLag += diff
-            self.nUpdateLags += 1
+            self.lag += (diff - self.atLeastUpdate)
 
-        if self.game is not None and self.animating:
+        game = self.game
+        if game is not None and self.animating:
             gt = self.gameTime(t)
-            self.game.update(gt)
-            polePoints = self.game.polePointsAt(gt)
-            self.updateDisplay(gt, polePoints)
-            self.components.BottomFrame.update(gt, self.game.ship.orbit())
+            ts = int(t)
+            if ts != self.lastSecond:
+                self.updateSec(gt, diff)
+                self.lastSecond = ts
 
-        self.lastUpdate = t
-        self.nUpdates +=1
-        self.frame.after(self.shouldUpdate, self.updateFast)
+            poleVecs = game.update(gt)
+            self.updateDisplay(gt, poleVecs)
+            orbit = game.ship.orbit()
+            if orbit is not None:
+                self.updateZoom(gt, orbit)
 
-    def updateSlow(self):
-        t = self.realTime()
+        self.lastTime = t
+        self.frame.after(self.shouldUpdate, self.tick)
 
-        if self.game is not None:
-            diff = t - self.lastUpdateSlow
-            lag = (self.totalLag - self.lastTotalLag)/diff
-            if lag > 0.1:
-                log('App', 'Avg lag/s: {}'.format(lag))
-
-            gt = self.gameTime(t)
-            self.updateClock(gt)
-
-        self.lastTotalLag = self.totalLag
-        self.lastUpdateSlow = t
-        self.frame.after(self.shouldUpdateSlow, self.updateSlow)
+    def updateSec(self, gt, diff):
+        """Update running game
+            @gt      game time
+            @diff    exact time since last call
+        """
+        dl = self.lag/diff
+        if dl > 0.1:
+            log('App', 'Relative lag: {}'.format(dl))
+        self.updateClock(gt)
+        self.lag = 0
 
     def cmd_launchShip(self):
         orbit = self.game.ship.orbit()
