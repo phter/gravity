@@ -3,7 +3,9 @@
 import time
 from concurrent.futures import ThreadPoolExecutor, wait as waitForFuture
 import tempfile
-from traceback import TracebackException
+try:
+    from traceback import TracebackException
+except: pass
 
 import tkinter as tk
 import numpy as np
@@ -441,9 +443,11 @@ class Display(Container):
 
         def logError(future):
             if future.exception() is not None:
-                tbe = TracebackException.from_exception(future.exception())
                 log('Display', 'ERROR creating images.')
-                log('Display', ''.join(tbe.format()))
+                try:
+                    tbe = TracebackException.from_exception(future.exception())
+                    log('Display', ''.join(tbe.format()))
+                except: pass
 
         self.loadingHeatmap.add_done_callback(logError)
         self.loadingVecors.add_done_callback(logError)
