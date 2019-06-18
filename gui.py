@@ -166,7 +166,7 @@ class Sliders(Container):
 
     def layout(self):
         for i, (label, slider) in enumerate(self.sliders):
-            label.grid(row=i, column=0, sticky=tk.E)
+            label.grid(row=i, column=0, pady=20, sticky=tk.E)
             slider.grid(row=i, column=1)
 
 
@@ -184,7 +184,7 @@ class AppButtons(Container):
 
     def layout(self):
         self.restartButton.grid(row=0, column=0, pady=30)
-        self.playButton.grid(row=0, column=1, pady=30)
+        self.playButton.grid(row=0, column=1, padx=10, pady=30)
         self.quitButton.grid(row=0, column=2, pady=30, padx=20)
 
 
@@ -1038,14 +1038,3 @@ class App(Container):
 
     def quit(self):
         self.frame.quit()
-
-
-
-
-
-
-
-
-
-
-

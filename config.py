@@ -101,14 +101,14 @@ class Config:
             'shipOutlineColor': Color(224, 16, 16),
 
             'launchButton': Color(192, 32, 32),
-            'clockBackground': Color(255, 235, 235),
+            'clockBackground': Color(240, 240, 240),
             'ValueLabelBackground': Color(245, 245, 245),
 
             'startPlanet': Color(16, 200, 200),
             'targetPlanet': Color(16, 220, 48),
             'planet': Color(220, 16, 32),
             'blackPlanet': Color(0, 0, 0),
-            'planetOutline': Color(5, 5, 5),
+            'planetOutline': Color(60, 60, 100),
             'blackPlanetOutline': Color(120, 120, 40),
             'planetRotor': Color(100, 100, 100),
             'ship': Color(224, 224, 16),
