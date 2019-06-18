@@ -348,7 +348,11 @@ class PlanetGenerator:
         for n in range(pt.count):
             pos = self.findPosition(rect, pt.radius)
             if pos is not None:
-                p = Planet(pos, pt, self.randomPlanetRotation())
+                if pt.name == 'black':
+                    rotation = 0
+                else:
+                    rotation = self.randomPlanetRotation()
+                p = Planet(pos, pt, rotation)
                 self.planets.append(p)
                 log('PlanetGenerator', 'Created {} planet at ({}, {})'.format(pt.name, pos.x, pos.y))
             else:

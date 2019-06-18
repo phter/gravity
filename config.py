@@ -108,7 +108,7 @@ class Config:
             'planet': Color(220, 16, 32),
             'blackPlanet': Color(0, 0, 0),
             'planetOutline': Color(5, 5, 5),
-            'blackPlanetOutline': Color(240, 240, 210),
+            'blackPlanetOutline': Color(120, 120, 40),
             'planetRotor': Color(100, 100, 100),
             'ship': Color(224, 224, 16),
             'shipOutline': Color(224, 16, 16)
@@ -166,7 +166,8 @@ class Settings:
 
     @property
     def planetDensityBlack(self):
-        return self.planetDensity*Config.fDensityBlack
+        d = self.planetDensity*Config.fDensityBlack
+        return Config.scaleFunc(d, self.s_blackDensity)
 
     @property
     def planetSize(self):
@@ -199,6 +200,7 @@ settingVars = {
         's_planetRotation': (-10, 10, 0),
         's_gravityConstant': (-5, 5, 0),
         's_animationSpeed': (-3, 3, 0),
+        's_blackDensity': (-5, 5, 0),
 
         # Absolute values
         'planetSpread': (1, 4, 2),
