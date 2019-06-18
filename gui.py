@@ -135,7 +135,13 @@ class Sliders(Container):
                   'from_': s.nLargePlanetsRange.start,
                   'to': s.nLargePlanetsRange.end,
                   'resolution': 1
-                 }]
+                 },
+                 {'variable': var['nBlackPlanets'],
+                  'text': 'Number of black holes',
+                  'from_': s.nBlackPlanetsRange.start,
+                  'to': s.nBlackPlanetsRange.end,
+                  'resolution': 1}
+                  ]
 
         for desc in sliders:
             row = sliderRow(self.frame, **desc)
@@ -235,8 +241,12 @@ class Display(Container):
         self.heatmapFile = tempfile.TemporaryFile()
         self.vectorFile = tempfile.TemporaryFile()
 
+        self.images = {
+                'gravity': None,
+                'vectors': None
+        }
         self.reset(universe)
-        self.app.components.display = self
+        self.app.components.Display = self
 
     def uni2canvas(self, up, cp):
         cp.x = up.x*self.u2c
@@ -254,6 +264,8 @@ class Display(Container):
         self.universe = universe
         self.bodyViews = []
         self.shipView = None
+        self.images['gravity'] = None
+        self.images['vectors'] = None
 
         if universe is not None:
             log('Display', 'Creating background images')
@@ -321,10 +333,11 @@ class Display(Container):
             gravState = tk.NORMAL
         else:
             gravState = tk.HIDDEN
-        self.gravityImage = self.canvas.create_image(self.cWidth/2,
-                                                self.cHeight/2,
-                                                image=self._gravityImage,
-                                                state=gravState)
+        img = self.canvas.create_image(self.cWidth/2,
+                                 self.cHeight/2,
+                                 image=self._gravityImage,
+                                 state=gravState)
+        self.images['gravity'] = img
         # Now the vector field
         log('Display', 'Creating Vector field image')
         sx = Config.canvasWidth
@@ -349,10 +362,11 @@ class Display(Container):
             vecState = tk.NORMAL
         else:
             vecState = tk.HIDDEN
-        self.vectorImage = self.canvas.create_image(self.cWidth/2,
-                                                    self.cHeight/2,
-                                                    image=self._vectorImage,
-                                                    state=vecState)
+        img = self.canvas.create_image(self.cWidth/2,
+                                       self.cHeight/2,
+                                       image=self._vectorImage,
+                                       state=vecState)
+        self.images['vectors'] = img
 
     def createBodyViews(self):
         bodies = self.universe.bodies
@@ -365,7 +379,10 @@ class Display(Container):
         createView(bodies[0], 'startPlanet')
         createView(bodies[1], 'targetPlanet')
         for body in bodies[2:]:
-            createView(body, 'planet')
+            if body.type == 'black':
+                createView(body, 'blackPlanet')
+            else:
+                createView(body, 'planet')
 
     def createShipView(self):
         sv = ShipView(self.app.game.ship,
@@ -377,6 +394,16 @@ class Display(Container):
 
     def layout(self):
         self.canvas.grid()
+
+    def showImage(self, name):
+        img = self.images[name]
+        if img is not None:
+            self.canvas.itemconfigure(img, state=tk.NORMAL)
+
+    def hideImage(self, name):
+        img = self.images[name]
+        if img is not None:
+            self.canvas.itemconfigure(img, state=tk.HIDDEN)
 
     def update(self, gt, polePoints):
         for i, bv in enumerate(self.bodyViews):
@@ -405,12 +432,13 @@ class BodyView:
 
     def draw(self, canvas):
         c = self.circle
+        outline = 'blackPlanetOutline' if self.body.type == 'black' else 'planetOutline'
         self.id = canvas.create_oval(c.center.x - c.radius,
                                      c.center.y - c.radius,
                                      c.center.x + c.radius,
                                      c.center.y + c.radius,
                                      fill=self.col.tkString(),
-                                     outline=Config.colors['planetOutline'].tkString())
+                                     outline=Config.colors[outline].tkString())
         c = self.circle.center
         r = self.circle.radius
         self.rotID = canvas.create_line(c.x,
@@ -471,9 +499,10 @@ class ShipView:
 class BottomFrame(Container):
     """Bottom area under universe display"""
 
-    def __init__(self, parent):
+    def __init__(self, parent, display):
         Container.__init__(self, parent)
 
+        self.display = display
         self.clock = Clock(self)
         self.showGravLabel = tk.Label(self.frame, text='Show gravity')
         self.showVectorsLabel = tk.Label(self.frame, text='Show vectors')
@@ -563,6 +592,7 @@ class BottomFrame(Container):
 
         self.showZoom = True
         self.zoomIsHidden = False
+
         self.app.components.updateZoom = self.update
 
     def makeTextLabel(self, text):
@@ -612,23 +642,13 @@ class BottomFrame(Container):
 
         self.zoomWindow.grid(row=0, column=9, rowspan=4, sticky=tk.E)
 
-    def display(self): return self.app.components.display
+    def onShowGravity(self): self.display.showImage('gravity')
 
-    def onShowGravity(self):
-        display = self.display()
-        display.canvas.itemconfigure(display.gravityImage, state=tk.NORMAL)
+    def onHideGravity(self): self.display.hideImage('gravity')
 
-    def onHideGravity(self):
-        display = self.display()
-        display.canvas.itemconfigure(display.gravityImage, state=tk.HIDDEN)
+    def onShowVectors(self): self.display.showImage('vectors')
 
-    def onShowVectors(self):
-        display = self.display()
-        display.canvas.itemconfigure(display.vectorImage, state=tk.NORMAL)
-
-    def onHideVectors(self):
-        display = self.display()
-        display.canvas.itemconfigure(display.vectorImage, state=tk.HIDDEN)
+    def onHideVectors(self): self.display.hideImage('vectors')
 
     def updateAnimationSpeed(self, s):
         ns = Config.scaleFunc(Config.timeFactor, float(s))
@@ -666,7 +686,7 @@ class MainFrame(Container):
     def __init__(self, parent):
         Container.__init__(self, parent)
         self.display = Display(self, None)
-        self.bottomFrame = BottomFrame(self)
+        self.bottomFrame = BottomFrame(self, self.display)
 
     def layout(self):
         self.display.position(0, 0)
@@ -745,7 +765,8 @@ class App(Container):
                 'planetSpread': tk.DoubleVar(),
                 'nSmallPlanets': tk.IntVar(),
                 'nNormalPlanets': tk.IntVar(),
-                'nLargePlanets': tk.IntVar()
+                'nLargePlanets': tk.IntVar(),
+                'nBlackPlanets': tk.IntVar()
                 }
 
         self.textVariables = {
@@ -778,7 +799,7 @@ class App(Container):
         self.position(0, 0)
         self.animating = False
 
-        self.updateDisplay = self.mainFrame.display.update
+        self.updateDisplay = self.components.Display.update
         self.updateClock = self.components.Clock.update
         self.updateZoom = self.components.updateZoom
         self.realTime = time.perf_counter

@@ -38,9 +38,11 @@ class Config:
     # Factors for large / small planets
     fRadiusSmall = 0.66
     fRadiusLarge = 1.5
+    fRadiusBlack = 0.5
 
     fDensitySmall = 1
     fDensityLarge = 1
+    fDensityBlack = 500
 
     planetSize = phylib.earth.radius
     planetDensity = phylib.earth.density
@@ -104,7 +106,9 @@ class Config:
             'startPlanet': Color(16, 200, 200),
             'targetPlanet': Color(16, 220, 48),
             'planet': Color(220, 16, 32),
+            'blackPlanet': Color(0, 0, 0),
             'planetOutline': Color(5, 5, 5),
+            'blackPlanetOutline': Color(240, 240, 210),
             'planetRotor': Color(100, 100, 100),
             'ship': Color(224, 224, 16),
             'shipOutline': Color(224, 16, 16)
@@ -146,6 +150,10 @@ class Settings:
         return self.planetSize*Config.fRadiusSmall
 
     @property
+    def planetRadiusBlack(self):
+        return self.planetSize*Config.fRadiusBlack
+
+    @property
     def planetDensityNormal(self):
         return self.planetDensity
 
@@ -155,6 +163,10 @@ class Settings:
     @property
     def planetDensitySmall(self):
         return self.planetDensity*Config.fDensitySmall
+
+    @property
+    def planetDensityBlack(self):
+        return self.planetDensity*Config.fDensityBlack
 
     @property
     def planetSize(self):
@@ -192,7 +204,8 @@ settingVars = {
         'planetSpread': (1, 4, 2),
         'nSmallPlanets': (0, 10, 5),
         'nNormalPlanets': (0, 8, 3),
-        'nLargePlanets': (0, 6, 2)
+        'nLargePlanets': (0, 6, 2),
+        'nBlackPlanets': (0, 3, 0)
 }
 
 for name, defn in settingVars.items():

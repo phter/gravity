@@ -33,13 +33,12 @@ class Planet(Body):
                       radius=pType.radius,
                       rotation=rotation,
                       density=pType.density)
-        self.type = pType
 
     def update(self, t): pass
 
     def __str__(self):
         return 'Planet(type={type}, pos=({x},{y}), rot={rot})'.format(
-                type=self.type.name,
+                type=self.type,
                 x=self.pos.x,
                 y=self.pos.y,
                 rot=self.rotation)
@@ -176,7 +175,11 @@ class Game:
                 'large': PlanetType('large',
                                     radius=settings.planetRadiusLarge,
                                     density=settings.planetDensityLarge,
-                                    count=settings.nLargePlanets)
+                                    count=settings.nLargePlanets),
+                'black': PlanetType('black',
+                                    radius=settings.planetRadiusBlack,
+                                    density=settings.planetDensityBlack,
+                                    count=settings.nBlackPlanets)
         }
 
     def build(self, gameVariables):
@@ -295,7 +298,9 @@ class PlanetGenerator:
                 continue
             if not self.addPlanets(self.pTypes['normal']):
                 continue
-            if self.addPlanets(self.pTypes['small']):
+            if not self.addPlanets(self.pTypes['small']):
+                continue
+            if self.addPlanets(self.pTypes['black']):
                 return
         raise Exception("Failed to create planets")
 
@@ -349,11 +354,3 @@ class PlanetGenerator:
             else:
                 return False
         return True
-
-
-
-
-
-
-
-
