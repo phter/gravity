@@ -43,9 +43,12 @@ class Container:
         if parent is None:
             app = None
             parentFrame = None
-        else:
+        elif isinstance(parent, Container):
             app = parent.app
             parentFrame = parent.frame
+        else:
+            app = None
+            parentFrame = parent
 
         self.app = app
         self.frame = tk.Frame(parentFrame)
@@ -175,10 +178,12 @@ class AppButtons(Container):
         Container.__init__(self, parent)
         self.quitButton = tk.Button(self.frame, text='Quit', command=self.app.quit)
         self.playButton = tk.Button(self.frame, text='New Game', command=self.app.startGame)
+        self.restartButton = tk.Button(self.frame, text='Restart', command=self.app.restartGame)
 
     def layout(self):
-        self.playButton.grid(row=1, column=0, pady=30)
-        self.quitButton.grid(row=1, column=1, pady=30, padx=20)
+        self.restartButton.grid(row=0, column=0, pady=30)
+        self.playButton.grid(row=0, column=1, pady=30)
+        self.quitButton.grid(row=0, column=2, pady=30, padx=20)
 
 
 class Clock(Container):
@@ -238,10 +243,10 @@ class Display(Container):
         @parent     parent container
     """
 
-    def __init__(self, parent, universe):
+    def __init__(self, parent):
         Container.__init__(self, parent)
 
-        self.universe = universe
+        self.universe = None
         uniRect = Config.uniRect
         # factors to translate universe coordinates to canvas cordinates and back
         self.u2c = Config.canvasWidth / uniRect.width()
@@ -263,8 +268,6 @@ class Display(Container):
         self.imageLoader = self.app.threadPool
         self.loadingHeatmap = None
         self.loadingVecors = None
-
-        self.reset(universe)
         self.app.components.Display = self
 
     def uni2canvas(self, up, cp):
@@ -277,10 +280,11 @@ class Display(Container):
         up.y = (self.cHeight - cp.y)*self.c2u
         return up
 
-    def reset(self, universe):
+    def reset(self, game):
         for id in self.canvas.find_all():
             self.canvas.delete(id)
-        self.universe = universe
+        self.game = game
+        self.universe = game.universe
         self.bodyViews = []
         self.movingBodyViews = []
         self.shipView = None
@@ -293,13 +297,13 @@ class Display(Container):
             self.loadingVecors.cancel()
             self.loadingVecors = None
 
-        if universe is not None:
+        if game.universe is not None:
             log('Display', 'Creating background images')
             self.createBackgroundImages()
             log('Display', 'Creating body views')
             self.createBodyViews()
             log('Display', 'Creating ship view')
-            self.createShipView()
+            self.createShipView(game.ship)
 
     def createMatplotlibAxes(self,
                              axes=None,
@@ -462,8 +466,8 @@ class Display(Container):
             else:
                 createView(i + 2, body, 'planet', True)
 
-    def createShipView(self):
-        sv = ShipView(self.app.game.ship,
+    def createShipView(self, ship):
+        sv = ShipView(ship,
                       Config.shipSize,
                       self.uni2canvas,
                       self.u2c)
@@ -690,7 +694,7 @@ class BottomFrame(Container):
                 arrow=tk.LAST,
                 arrowshape=Config.zoomArrowShape,
                 width=Config.zoomArrowWidth,
-                fill=Config.colors['zoomOutline'].tkString())
+                fill=Config.colors['zoomArrow'].tkString())
 
         self.showZoom = True
         self.zoomIsHidden = False
@@ -787,7 +791,7 @@ class MainFrame(Container):
 
     def __init__(self, parent):
         Container.__init__(self, parent)
-        self.display = Display(self, None)
+        self.display = Display(self)
         self.bottomFrame = BottomFrame(self, self.display)
 
     def layout(self):
@@ -937,31 +941,45 @@ class App(Container):
         self.mainFrame.position(0, 0)
         self.sideFrame.position(0, 1)
 
-    def startGame(self):
-        log('App', 'Creating new game')
-        for k, var in self.settingVariables.items():
-            log('App', 'Setting {} to {}'.format(k, var.get()))
-            self.settings.set(k, var.get())
-
-        log('App', 'Building new game')
-        game =  Game(self.settings)
-        self.gameVariables = GameVariables(self, game)
-        game.build(self.gameVariables)
-        # don't assign this until the game is fully initialized
-        self.game = game
-
-        log('App', 'Creating views')
-        self.mainFrame.display.reset(self.game.universe)
-        self.resetGameCounters()
-
+    def resetTextVariables(self):
         self.textVariables['nLostShips'].set('0')
         self.textVariables['nLaunches'].set('0')
         self.textVariables['flightLength'].set('0')
         self.textVariables['usedFuel'].set('0')
         self.textVariables['gameTime'].set('00d 00h 00m 00s')
 
-        self.game.start()
+    def buildGame(self):
+        log('App', 'Creating new game')
+        for k, var in self.settingVariables.items():
+            log('App', 'Setting {} to {}'.format(k, var.get()))
+            self.settings.set(k, var.get())
+
+        log('App', 'Building new game')
+        game = Game(self.settings)
+        self.gameVariables = GameVariables(self, game)
+        game.build(self.gameVariables)
+        # don't assign this until the game is fully initialized
+        return game
+
+    def startGame(self):
+        self.game = None
+        game = self.buildGame()
+        game.start()
+        self.components.Display.reset(game)
+        self.runGame(game)
+
+    def restartGame(self):
+        game = self.game
+        self.game = None
+        game.restart()
+        self.components.Display.reset(game)
+        self.runGame(game)
+
+    def runGame(self, game):
+        self.resetGameCounters()
+        self.resetTextVariables()
         self.animating = True
+        self.game = game
 
     def tick(self):
         t = self.realTime()

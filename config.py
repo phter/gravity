@@ -29,7 +29,7 @@ class Config:
     targetAreaWidth = 2e7
 
     # Trajectory stuff
-    maxTrajectoryLength = uniRect.width()*10
+    maxTrajectoryLength = uniRect.width()*500
     maxTrajectoryError = uniRect.width()/400
     # Minimal stored segment length
     minPolySegmentLength = uniRect.width()/500
@@ -95,6 +95,7 @@ class Config:
             'canvasBackground': Color(14, 0, 80),
             'zoomWindowBackground': Color(14, 0, 80),
             'zoomOutline': Color(230, 230, 230),
+            'zoomArrow': Color(250, 250, 20),
 
             'shipColor': Color(224, 224, 16),
             'shipOutlineColor': Color(224, 16, 16),

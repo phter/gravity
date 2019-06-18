@@ -159,9 +159,6 @@ class Game:
         self.targetPlanet = None    # planet where we want to go to
         self.ship = None
         self.gameVariables = None   # In-game variables displayed in GUI
-        self.startTime = 0
-        self.endTime = np.Inf       # game time when game ended
-        self.lastUpdate = 0         # game time of last update
 
         self.planetTypes = {
                 'normal': PlanetType('normal',
@@ -181,6 +178,11 @@ class Game:
                                     density=settings.planetDensityBlack,
                                     count=settings.nBlackPlanets)
         }
+        self.resetCounters()
+
+    def resetCounters(self):
+        self.endTime = np.Inf       # game time when game ended
+        self.lastUpdate = 0         # game time of last update
 
     def build(self, gameVariables):
         self.gameVariables = gameVariables
@@ -191,9 +193,6 @@ class Game:
         self.universe = Universe(pg.planets, Config.uniRect, self.settings.gravityConstant)
         self.startPlanet = pg.startPlanet
         self.targetPlanet = pg.targetPlanet
-        log('Game', 'Creating ship')
-        self.ship = Ship(self.startPlanet, 0, self.universe, self.gameVariables)
-        self.updateShip = self.ship.update  # silly optimization
 
         self.aRotations = np.array([body.rotation for body in self.universe.bodies])
         self.aPoles = np.array([[0, 1]] * len(self.aRotations), dtype=np.double)
@@ -207,10 +206,12 @@ class Game:
             @t       start time
         """
         log('Game', 'Starting new game')
+        self.ship = Ship(self.startPlanet, 0, self.universe, self.gameVariables)
 
-        # List of trajectories of the ship
-        self.trajectories = []
-        self.startTime = time.perf_counter()
+    def restart(self):
+        """Restart an existing game with the same settings as the last one"""
+
+        self.start()
 
     def launchShip(self, gt, thrust):
         """Launches a ship at game time gt with thrust thrust"""
@@ -225,7 +226,7 @@ class Game:
         Returns an array of current pole vectors.
         """
 
-        self.updateShip(gt)
+        self.ship.update(gt)
         self.lastUpdate = gt
         return self.poleVectors(gt)
 
