@@ -17,7 +17,10 @@ import phylib
 
 
 class Config:
-    """Global app configuration"""
+    """Global app configuration
+
+    Values declared here never change during runtime
+    """
 
     # Time (in ms) between updates of the GUI
     updateInterval = 75
@@ -119,7 +122,8 @@ class Config:
 class Settings:
     """User adjustable settings
 
-    Member format:
+    Some settings have an valid range associated with them.
+    The format is:
         .settingName = value
         .settingNameRange = Interval(min, max)
     """
@@ -129,8 +133,8 @@ class Settings:
 
         if not hasattr(self, k):
             raise Exception('No such setting: ' + k)
-        interval = getattr(self, k + 'Range')
-        if v not in interval:
+        interval = getattr(self, k + 'Range', None)
+        if v is not None and v not in interval:
             raise Exception('Value {v} for {n} out of range ({min}, {max})'.format(
                     v=v, n=k, min=interval.start, max=interval.end))
         setattr(self, k, v)
@@ -139,62 +143,39 @@ class Settings:
         return getattr(self, k)
 
     @property
-    def planetRadiusNormal(self):
-        return self.planetSize
-
+    def planetRadiusNormal(self): return self.planetSize
     @property
-    def planetRadiusLarge(self):
-        return self.planetSize*Config.fRadiusLarge
-
+    def planetRadiusLarge(self): return self.planetSize*Config.fRadiusLarge
     @property
-    def planetRadiusSmall(self):
-        return self.planetSize*Config.fRadiusSmall
-
+    def planetRadiusSmall(self): return self.planetSize*Config.fRadiusSmall
     @property
-    def planetRadiusBlack(self):
-        return self.planetSize*Config.fRadiusBlack
-
+    def planetRadiusBlack(self): return self.planetSize*Config.fRadiusBlack
     @property
-    def planetDensityNormal(self):
-        return self.planetDensity
-
+    def planetDensityNormal(self): return self.planetDensity
     @property
-    def planetDensityLarge(self):
-        return self.planetDensity*Config.fDensityLarge
+    def planetDensityLarge(self): return self.planetDensity*Config.fDensityLarge
     @property
-    def planetDensitySmall(self):
-        return self.planetDensity*Config.fDensitySmall
-
+    def planetDensitySmall(self): return self.planetDensity*Config.fDensitySmall
     @property
     def planetDensityBlack(self):
         d = self.planetDensity*Config.fDensityBlack
         return Config.scaleFunc(d, self.s_blackDensity)
-
     @property
-    def planetSize(self):
-        return Config.scaleFunc(Config.planetSize, self.s_planetSize)
-
+    def planetSize(self): return Config.scaleFunc(Config.planetSize, self.s_planetSize)
     @property
-    def planetDensity(self):
-        return Config.scaleFunc(Config.planetDensity, self.s_planetDensity)
-
+    def planetDensity(self): return Config.scaleFunc(Config.planetDensity, self.s_planetDensity)
     @property
-    def planetRotation(self):
-        return Config.scaleFunc(Config.planetRotation, self.s_planetRotation)
-
+    def planetRotation(self): return Config.scaleFunc(Config.planetRotation, self.s_planetRotation)
     @property
-    def gravityConstant(self):
-        return Config.scaleFunc(Config.gravityConstant, self.s_gravityConstant)
-
+    def gravityConstant(self): return Config.scaleFunc(Config.gravityConstant, self.s_gravityConstant)
     @property
-    def animationSpeed(self):
-        return Config.scaleFunc(Config.timeFactor, self.s_animationSpeed)
+    def animationSpeed(self): return Config.scaleFunc(Config.timeFactor, self.s_animationSpeed)
 
 
 # For all of these, we will create two attributes:
 #   1) Settings.{name}  will be set to the third value
 #   2) Settings.{name}Range will be set to an interval [first, second] value.
-settingVars = {
+varRanges = {
         # Scaling values
         's_planetSize': (-5, 5, 0),
         's_planetDensity': (-5, 5, 0),
@@ -211,6 +192,6 @@ settingVars = {
         'nBlackPlanets': (0, 3, 0)
 }
 
-for name, defn in settingVars.items():
+for name, defn in varRanges.items():
     setattr(Settings, name, defn[2])
     setattr(Settings, name + 'Range', Interval(defn[0], defn[1]))

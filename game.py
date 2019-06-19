@@ -1,7 +1,6 @@
 """Game mechanics"""
 
 import numpy as np
-import time
 import random
 from config import Config
 from geometry import Point, Rect
