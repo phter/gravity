@@ -1,73 +1,15 @@
 """Graphical user interface"""
 
+from concurrent.futures import ThreadPoolExecutor
 import time
-from concurrent.futures import ThreadPoolExecutor, wait as waitForFuture
-import tempfile
-try:
-    from traceback import TracebackException
-except: pass
-
 import tkinter as tk
 import numpy as np
-from matplotlib.figure import Figure as mplFigure
-from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
-import PIL
-from PIL.ImageTk import PhotoImage as tkPhotoImage
-import PIL.ImageEnhance
 
 from util import log
 from config import Config
 from game import Game
-from geometry import Point, Circle
-
-
-class Container:
-    """Container for widgets / other containers
-
-        @parent     parent container
-
-    Helper class to simplify layout generation:
-    Tkinter doesn't like it, if a parent's .grid() method is called
-    before .grid() has been called on all children. This class takes care
-    of that:
-
-        .layout()
-            should create the layout of all widgets inside.
-        .position(row, column)
-            will call grid and make sure layout() gets called first,
-            if it hasn't already been called.
-
-    Generally speaking, there is no reason to call .layout() manually.
-    Just call .position() as you would call .grid() on a widget.
-    """
-
-    def __init__(self, parent):
-        if parent is None:
-            app = None
-            parentFrame = None
-        elif isinstance(parent, Container):
-            app = parent.app
-            parentFrame = parent.frame
-        else:
-            app = None
-            parentFrame = parent
-
-        self.app = app
-        self.frame = tk.Frame(parentFrame)
-        self.hasLayout = False
-
-    def position(self, row=None, column=None, **kwds):
-        if not self.hasLayout:
-            self.layout()
-            self.hasLayout = True
-
-        kwds['row'] = row
-        kwds['column'] = column
-        self.frame.grid(**kwds)
-
-    # Stub, must be overridden by subclasses
-    def layout(self):
-        raise NotImplementedError("Missing layout method in " + self.__class__.__name__)
+from spaceview import SpaceView
+from tkutil import Container
 
 
 def sliderRow(frame, **desc):
@@ -234,376 +176,6 @@ class Controls(Container):
     def layout(self):
         self.sliders.position(0, 0)
         self.buttons.position(2, 0)
-
-
-FGTAG = 'fg'    # tag for all objects above background images
-
-
-class Display(Container):
-    """Universe display
-
-        @parent     parent container
-    """
-
-    def __init__(self, parent):
-        Container.__init__(self, parent)
-
-        self.universe = None
-        uniRect = Config.uniRect
-        # factors to translate universe coordinates to canvas cordinates and back
-        self.u2c = Config.canvasWidth / uniRect.width()
-        self.c2u = 1/self.u2c
-        self.cWidth = Config.canvasWidth
-        self.cHeight = uniRect.height()*self.u2c
-        self.cColor = Config.colors['canvasBackground'].tkString()
-        self.canvas = tk.Canvas(self.frame,
-                                width=self.cWidth,
-                                height=self.cHeight,
-                                bg=self.cColor)
-        self.heatmapFile = tempfile.TemporaryFile()
-        self.vectorFile = tempfile.TemporaryFile()
-
-        self.images = {
-                'gravity': None,
-                'vectors': None
-        }
-        self.imageLoader = self.app.threadPool
-        self.loadingHeatmap = None
-        self.loadingVecors = None
-        self.app.components.Display = self
-
-    def uni2canvas(self, up, cp):
-        cp.x = up.x*self.u2c
-        cp.y = self.cHeight - up.y*self.u2c
-        return cp
-
-    def canvas2uni(self, cp, up):
-        up.x = cp.x*self.c2u
-        up.y = (self.cHeight - cp.y)*self.c2u
-        return up
-
-    def reset(self, game):
-        for id in self.canvas.find_all():
-            self.canvas.delete(id)
-        self.game = game
-        self.universe = game.universe
-        self.bodyViews = []
-        self.movingBodyViews = []
-        self.shipView = None
-        self.images['gravity'] = None
-        self.images['vectors'] = None
-        if self.loadingHeatmap is not None:
-            self.loadingHeatmap.cancel()
-            self.loadingVecors = None
-        if self.loadingVecors is not None:
-            self.loadingVecors.cancel()
-            self.loadingVecors = None
-
-        if game.universe is not None:
-            log('Display', 'Creating background images')
-            self.createBackgroundImages()
-            log('Display', 'Creating body views')
-            self.createBodyViews()
-            log('Display', 'Creating ship view')
-            self.createShipView(game.ship)
-
-    def createMatplotlibAxes(self,
-                             axes=None,
-                             width=Config.canvasWidth,
-                             height=Config.canvasHeight):
-        if axes is None:
-            axes = [0., 0., 1., 1.]
-        # This is a bit tricky / ugly.
-        # matplotlib does not allow us to specify exact pixel values.
-        # So we need to use a hack here.
-        fig = mplFigure(frameon=False)
-        DPI = float(fig.get_dpi())
-
-        fCanvas = FigureCanvas(fig)
-        fig.set_size_inches(width/DPI, height/DPI)
-
-        # We don't want any axes drawn, of course.
-        ax = fig.add_axes(axes)
-        ax.set_axis_off()
-        return (ax, fCanvas, DPI)
-
-    def createGravityHeatmap(self, gravLogValues):
-        log('Display', 'Creating gravity heatmap')
-
-        (ax, fCanvas, DPI) = self.createMatplotlibAxes()
-
-        # cmap sets the used (predefined) colormap
-        ax.matshow(gravLogValues, cmap='inferno', interpolation='bicubic')
-
-        # Overwrite image from previous game
-        self.heatmapFile.seek(0)
-
-        # This seems to be the only way to get an exact pixel count:
-        # Save the image to a file and specify dpi to use.
-        fCanvas.print_figure(self.heatmapFile, dpi=DPI)
-        img = PIL.Image.open(self.heatmapFile)
-
-        # Flip image, because canvas y-coordinates increase downwards...
-        img = img.transpose(PIL.Image.FLIP_TOP_BOTTOM)
-
-        # Ths is important:
-        # 1) We need to use PIL.ImageTk.PhotoImage to make Tkinter happy
-        # 2) We need to keep a reference to the image, otherwise it will
-        #    disappear immediately.
-        self._gravityImage = tkPhotoImage(img)
-
-        # Tkinter's default anchor is the middle of the image
-        if self.app.toggleShowGravity.get() == 1:
-            gravState = tk.NORMAL
-        else:
-            gravState = tk.HIDDEN
-        img = self.canvas.create_image(self.cWidth/2,
-                                 self.cHeight/2,
-                                 image=self._gravityImage,
-                                 state=gravState)
-
-        self.canvas.tag_lower(img, FGTAG)
-        self.images['gravity'] = img
-        log('Display', 'Creating gravity heatmap ... done')
-
-    def createVectorImage(self, gravLogVectors, gravity):
-        log('Display', 'Creating Vector field image')
-        sx = Config.canvasWidth
-        sy = Config.canvasHeight
-        zx = sx*1.1
-        zy = sy*1.1
-        dx = zx - sx
-        dy = zy - sy
-
-        log('Display', 'Waiting for gravity heatmap to complete...')
-        # Argument has to be a tuple.
-        # You'd think Python would make this clear in the documentation
-        # You'd be wrong.
-        waitForFuture((gravity,)) # must wait on this to get its ID
-
-        log('Display', 'Letting matplotlib do its thing')
-        (ax, fCanvas, DPI) = self.createMatplotlibAxes(width=zx, height=zy)
-        ax.quiver(self.universe.gravVectorGridX,
-                  self.universe.gravVectorGridY,
-                  gravLogVectors[:,:,0],
-                  gravLogVectors[:,:,1],
-                  angles='xy',
-                  facecolor=Config.colors['canvasBackground'].tkString(),
-                  antialiased=True)
-        log('Display', 'Matplotlib ... done.')
-
-        self.vectorFile.seek(0)
-        fCanvas.print_figure(self.vectorFile,
-                             dpi=DPI)
-        img = PIL.Image.open(self.vectorFile)
-        img = img.crop((dx/2, dy/2, zx - dx/2, zy - dy/2))
-        meh = PIL.ImageEnhance.Sharpness(img)
-        # Smooth out ugly pixelated arrows
-        img = meh.enhance(0.4)
-
-        # for some reason, this is exceedingly slow in this case.
-        # self._vectorImage = tkPhotoImage(img)
-        # It has to do with image transparency, which is not really
-        # supported by Tkinter. But I'm not sure about the details.
-
-        img = img.convert(mode='RGB')
-        self._vectorImage = tkPhotoImage(img)
-
-        if self.app.toggleShowVectors.get() == 1:
-            vecState = tk.NORMAL
-        else:
-            vecState = tk.HIDDEN
-        img = self.canvas.create_image(self.cWidth/2,
-                                       self.cHeight/2,
-                                       image=self._vectorImage,
-                                       state=vecState)
-
-        # Move the image just above the heatmap
-        self.canvas.tag_raise(img, self.images['gravity'])
-        self.images['vectors'] = img
-        log('Display', 'Creating Vector field image ... done')
-
-    def createBackgroundImages(self):
-        # Use logarithmic scale here, otherwise we don't get a useful
-        # picture.
-        log('Display', 'Calculating numpy matrices')
-        realGravMatrix = self.universe.gravityMatrix
-        gravLogValues = np.log(realGravMatrix)
-        d = gravLogValues / realGravMatrix
-        gravLogVectors = self.universe.gravityVectorMatrix.copy()
-        gravLogVectors[:,:,0] *= d
-        gravLogVectors[:,:,1] *= d
-        log('Display', 'Calculating numpy matrices ... done')
-
-        self.loadingHeatmap = self.imageLoader.submit(self.createGravityHeatmap,
-                                                      gravLogValues)
-        self.loadingVecors = self.imageLoader.submit(self.createVectorImage,
-                                                     gravLogVectors,
-                                                     self.loadingHeatmap)
-
-        def logError(future):
-            if future.exception() is not None:
-                log('Display', 'ERROR creating images.')
-                try:
-                    tbe = TracebackException.from_exception(future.exception())
-                    log('Display', ''.join(tbe.format()))
-                except: pass
-
-        self.loadingHeatmap.add_done_callback(logError)
-        self.loadingVecors.add_done_callback(logError)
-
-    def createBodyViews(self):
-        bodies = self.universe.bodies
-
-        def createView(index, body, col, rotating):
-            bv = BodyView(body, Config.colors[col], self.uni2canvas, self.u2c)
-            bv.draw(self.canvas)
-            self.bodyViews.append(bv)
-            if rotating:
-                self.movingBodyViews.append((index, bv))
-
-        createView(0, bodies[0], 'startPlanet', True)
-        createView(1, bodies[1], 'targetPlanet', True)
-        for i, body in enumerate(bodies[2:]):
-            if body.type == 'black':
-                createView(i + 2, body, 'blackPlanet', False)
-            else:
-                createView(i + 2, body, 'planet', True)
-
-    def createShipView(self, ship):
-        sv = ShipView(ship,
-                      Config.shipSize,
-                      self.uni2canvas,
-                      self.u2c)
-        sv.draw(self.canvas)
-        self.shipView = sv
-
-    def layout(self):
-        self.canvas.grid()
-
-    def showImage(self, name):
-        img = self.images[name]
-        if img is not None:
-            self.canvas.itemconfigure(img, state=tk.NORMAL)
-
-    def hideImage(self, name):
-        img = self.images[name]
-        if img is not None:
-            self.canvas.itemconfigure(img, state=tk.HIDDEN)
-
-    def update(self, gt, polePoints):
-        for i, bv in self.movingBodyViews:
-            bv.update(self.canvas, polePoints[i])
-
-        self.shipView.update(self.canvas, gt)
-
-
-class BodyView:
-    """View responsible for drawing (rotating) bodies
-
-        @body        body for this view
-        @color       a Color instance
-        @uni2canvas  a function to translate universe coords to canvas coords
-        @scale       scale factor  (canvas width / universe width)
-    """
-
-    def __init__(self, body, color, uni2canvas, scale):
-        self.id = None # filled later
-        self.rotID = None # filled later
-        self.u2c = uni2canvas
-        self.scale = scale
-        self.circle = Circle(self.u2c(body.pos, Point(0, 0)), body.radius*scale)
-        self.body = body
-        self.col = color
-
-
-
-    def drawCircle(self, canvas, r, fill, outline):
-        c = self.circle
-        m = c.center
-        id = canvas.create_oval(m.x - r,
-                                m.y - r,
-                                m.x + r,
-                                m.y + r,
-                                fill=fill,
-                                outline=outline,
-                                tags=FGTAG)
-        return id
-
-    def drawBody(self, canvas):
-        if self.body.type == 'black':
-            outline = 'blackPlanetOutline'
-        else:
-            outline = 'planetOutline'
-        self.id = self.drawCircle(canvas,
-                                  self.circle.radius,
-                                  self.col.tkString(),
-                                  Config.colors[outline].tkString())
-
-    def drawRotor(self, canvas):
-         c = self.circle.center
-         r = self.circle.radius
-         col = Config.colors['planetRotor'].tkString()
-         self.rotID = canvas.create_line(c.x,
-                                         c.y,
-                                         c.x,
-                                         c.y - r,
-                                         width=2,
-                                         fill=col,
-                                         tags=FGTAG)
-
-    def draw(self, canvas):
-        self.drawBody(canvas)
-        if self.body.type != 'black':
-            self.drawRotor(canvas)
-
-    def update(self, canvas, polePoint):
-        c = self.circle.center
-        r = self.circle.radius
-        canvas.coords(self.rotID,
-                      c.x,
-                      c.y,
-                      c.x + r*polePoint[0],
-                      c.y - r*polePoint[1])
-
-
-class ShipView:
-    """View responsible for drawing the ship
-
-        @ship          the ship to display
-        @size          size of square around ship display
-        @uni2canvas    a function to translate universe coords to canvas coords
-        @scale         scale factor  (canvas width / universe width)
-    """
-
-    def __init__(self, ship, size, uni2canvas, scale):
-        self.id = None # filled later
-        self.ship = ship
-        self.u2c = uni2canvas
-        self.scale = scale
-        self.size = size
-        self.offset = size/2
-        self.bufPoint = Point(0, 0)
-
-    def draw(self, canvas):
-        p = self.u2c(self.ship.positionAt(0), self.bufPoint)
-        off = self.offset
-        self.id = canvas.create_oval(p.x - off,
-                                     p.y - off,
-                                     p.x + off,
-                                     p.y + off,
-                                     fill=Config.colors['ship'].tkString(),
-                                     outline=Config.colors['shipOutline'].tkString(),
-                                     tags=FGTAG)
-
-    def update(self, canvas, gt):
-        p = self.u2c(self.ship.positionAt(gt), self.bufPoint)
-        off = self.offset
-        canvas.coords(self.id,
-                      p.x - off,
-                      p.y - off,
-                      p.x + off,
-                      p.y + off)
 
 
 class BottomFrame(Container):
@@ -795,7 +367,7 @@ class MainFrame(Container):
 
     def __init__(self, parent):
         Container.__init__(self, parent)
-        self.display = Display(self)
+        self.display = SpaceView(self)
         self.bottomFrame = BottomFrame(self, self.display)
 
     def layout(self):
@@ -914,7 +486,7 @@ class App(Container):
         self.position(0, 0)
         self.animating = False
 
-        self.updateDisplay = self.components.Display.update
+        self.updateSpaceView = self.components.SpaceView.update
         self.updateClock = self.components.Clock.update
         self.updateZoom = self.components.updateZoom
         self.realTime = time.perf_counter
@@ -969,14 +541,14 @@ class App(Container):
         self.game = None
         game = self.buildGame()
         game.start()
-        self.components.Display.reset(game)
+        self.components.SpaceView.reset(game)
         self.runGame(game)
 
     def restartGame(self):
         game = self.game
         self.game = None
         game.restart()
-        self.components.Display.reset(game)
+        self.components.SpaceView.reset(game)
         self.runGame(game)
 
     def runGame(self, game):
@@ -1000,7 +572,7 @@ class App(Container):
                 self.lastSecond = ts
 
             poleVecs = game.update(gt)
-            self.updateDisplay(gt, poleVecs)
+            self.updateSpaceView(gt, poleVecs)
             orbit = game.ship.orbit()
             if orbit is not None:
                 self.updateZoom(gt, orbit)

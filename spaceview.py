@@ -38,8 +38,6 @@ class SpaceView(Container):
                                 width=self.cWidth,
                                 height=self.cHeight,
                                 bg=self.cColor)
-        self.heatmapFile = tempfile.TemporaryFile()
-        self.vectorFile = tempfile.TemporaryFile()
 
         self.images = {
                 'gravity': None,
