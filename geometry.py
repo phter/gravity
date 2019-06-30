@@ -23,25 +23,9 @@ Y-angle:      starting at (0, 1), increases clockwise (-inf, inf)
 """
 
 
-class Common2:
-    def __init__(self, x, y=None):
-        if y is None:
-            if type(x) is np.ndarray and len(x) == 2:
-                self.npa = x
-            else:
-                self.npa = np.array((x[0], x[1]), dtype=np.double)
-        else:
-            self.npa = np.array((x, y), dtype=np.double)
-
-    @property
-    def x(self): return self.npa[0]
-    @x.setter
-    def x(self, v): self.npa[0] = v
-
-    @property
-    def y(self): return self.npa[1]
-    @y.setter
-    def y(self, v): self.npa[1] = v
+class NPAView:
+    def __init__(self, npa):
+        self.npa = npa
 
     def __getitem__(self, i): return self.npa[i]
     def __setitem__(self, i, v): self.npa[i] = v
@@ -74,17 +58,42 @@ class Common2:
         self.npa /= k
         return self
 
+    def copy(self):
+        return self.__class__(self.npa.copy())
+
+    def _make(self):
+        raise NotImplementedError()
+
+
+class Common2(NPAView):
+    def __init__(self, x, y=None):
+        if y is None:
+            if type(x) is np.ndarray and len(x) == 2:
+                npa = x
+            elif isinstance(x, NPAView):
+                npa = x.npa
+            else:
+                npa = np.array((x[0], x[1]), dtype=np.double)
+        else:
+            npa = np.array((x, y), dtype=np.double)
+
+        NPAView.__init__(self, npa)
+
+    @property
+    def x(self): return self.npa[0]
+    @x.setter
+    def x(self, v): self.npa[0] = v
+
+    @property
+    def y(self): return self.npa[1]
+    @y.setter
+    def y(self, v): self.npa[1] = v
+
     def __eq__(self, p):
         return self.npa[0] == p.npa[0] and self.npa[1] == p.npa[1]
 
     def __hash__(self):
         return hash(self.npa[0], self.npa[1])
-
-    def _make(self):
-        raise NotImplementedError()
-
-    def copy(self):
-        return self.__class__(self.npa.copy())
 
 
 class Point(Common2):

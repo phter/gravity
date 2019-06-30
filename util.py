@@ -8,6 +8,32 @@ def log(who, what):
     print('{}: {}'.format(who, what))
 
 
+def updateExisting(d, *dicts, **kwds):
+    """Update existing entries of dict d with entries from dicts and kwds
+
+    It is an error if o contains keys not present in d
+    """
+
+    dicts = list(dicts)
+    dicts.append(kwds)
+    if all(k in d for k in dict for dict in dicts):
+        for dict in dicts:
+            d.update(dict)
+        return d
+    else:
+        for dict in dicts:
+            for k in dict:
+                if k not in d:
+                    raise ValueError('Key not in dict: ' + k)
+        raise Exception('Something weird has happended')
+
+
+def updateDefaults(d, *dicts, **kwds):
+    """Return a new dictionary with defaults from d and updates from o"""
+
+    return updateExisting(d.copy(), *dicts, **kwds)
+
+
 def randomFloat(a, b):
     """Return a random floating point number a <= x <= b"""
 
