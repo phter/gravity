@@ -30,8 +30,12 @@ ph: Konfiguration planen und erstellen (3)
 22.5:
 ph: Erzeugung der Planeten (4)
 
+22.5:
+bab: Stoppuhr (2)
+
 26.5:
 ph: Geometrie Bibliothek (4)
+bab: Stoppuhr (1.5)
 
 27.5:
 ph: Rotation der Planeten, Dokumentation (4)
@@ -66,11 +70,26 @@ ph: Berechnung der Flugbahn, Dokumentation (4)
 6.6:
 ph: Berechnung der Flugbahn, Dokumentation, Clean-up (4)
 
+8.6:
+bab: Schwarzes Loch (3.5)
+
+9.6:
+bab: Schwarzes Loch (2)
+
 10.6:
 ph: Berechnung des Landepunktes (2)
 
+11.6:
+bab: Schwarzes Loch (3)
+
 12.6:
 jan: Einstellungen einlesen/auslesen, Labels mit zusätzlicher Info (5)
+bab: Schwarzes Loch (2)
+bab: Feldlinien (2.5)
+
+13.6:
+bab: Richtungspfeil (2.5)
+bab: Schwarzes Loch (4)
 
 14.6:
 ph: Visualisierung Gravitationsfeld (4)
@@ -82,8 +101,22 @@ ph: Visualisierung Gravitationsvektoren (2)
 16.06:
 jan: Einstellungen einlesen/auslesen (5)
 ph: Fluglaengenberechnung/Fehlersuche (2)
+bab: Schwarzes Loch (4.5)
 
+17.6:
+bab: Schwarzes Loch (1.5)
 
+1.7:
+ph: GUI code aufräumen (3)
+
+2.7: geometry.py umschreiben, Views auf numpy arrays verwenden, anstatt
+     Python Objekte (2)
+
+3.7:
+ph: Spaceview in eigene Datei auslagern, von Spiellogik entkoppeln (4)
+
+9.7:
+jan: Einstellungen einlesen/auslesen (2)
 
 
 
