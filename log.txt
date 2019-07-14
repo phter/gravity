@@ -1,4 +1,5 @@
 Logbuch
+=======
 
 bab barbara honeder
 jan jan koegl
@@ -117,6 +118,9 @@ ph: Spaceview in eigene Datei auslagern, von Spiellogik entkoppeln (4)
 
 9.7:
 jan: Einstellungen einlesen/auslesen (2)
+
+12.7:
+ph: Dateidialoge zum Laden/Speichern der Einstellungen (1)
 
 
 

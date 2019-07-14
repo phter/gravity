@@ -1,4 +1,5 @@
-Benutzte Bibliotheken:
+Benutzte Bibliotheken
+=====================
 
 math                  - obviously
 random                - to generate random planet positions
@@ -11,9 +12,19 @@ matplotlib            - to create gravity visualization
 PIL                   - to transform images / make matplotlib play nice with Tkinter
 
 
-Nützliche Mathematik:
+Nützliche Mathematik
+====================
 
-- Der Flächeninhalt eines Dreiecks, das von zwei Vektoren im 2-dimensionalen
+- Der Flächeninhalt des Parallelograms, das von zwei Vektoren im 2-dimensionalen
   Raum aufgespannt wird, ist ein gutes Maß für die "Verschiedenheit" von
   zwei Vektoren und einfach zu berechnen: (v.x*w.y - v.y*w.x)/2.
   Wir benutzen das zur Abschätzung von dt bei der Berechnung der Flugbahn.
+
+
+Fehler / Verbesserungsmöglichkeiten
+===================================
+
+Viele :)
+
+- Eine globale Konfigurationsdatei ist praktisch. Trotzdem sollten Objekte
+  NICHT direkt darauf zugreifen, sondern immer nur auf übergebene Parameter.
