@@ -24,8 +24,8 @@ The following simplifications have been made:
 
 """
 
-from gui import App
-from config import Settings
+from src.gui import App
+from src.config import Settings
 
 app = App(Settings())
 app.run()
