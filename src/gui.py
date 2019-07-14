@@ -7,11 +7,11 @@ from tkinter import filedialog
 import numpy as np
 import json
 
-from util import log
-from config import Config
-from game import Game
-from spaceview import SpaceView
-from tkutil import Container
+from .util import log
+from .config import Config
+from .game import Game
+from .spaceview import SpaceView
+from .tkutil import Container
 
 
 def sliderRow(frame, **desc):

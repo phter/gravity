@@ -11,9 +11,9 @@ contains app configuration. Can not be changed by user.
 variables that can be changed by user.
 """
 
-from geometry import Rect
-from util import Interval, Color, expScalingFunction
-import phylib
+from .geometry import Rect
+from .util import Interval, Color, expScalingFunction
+import src.phylib as phylib
 
 
 class Config:

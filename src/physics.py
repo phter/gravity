@@ -8,10 +8,11 @@ of all bodies combined at this point.
 
 
 import numpy as np
-from geometry import Point, Vector, Circle
-from config import Config
-from util import log
-import phylib
+
+from .geometry import Point, Vector, Circle
+from .config import Config
+from .util import log
+import src.phylib as phylib
 
 
 class Body(Circle):

@@ -2,10 +2,10 @@
 
 import numpy as np
 import random
-from config import Config
-from geometry import Point, Rect
-from physics import Body, Universe, Trajectory, SurfaceOrbit
-from util import randomFloat, randomPointRect, log
+from .config import Config
+from .geometry import Point, Rect
+from .physics import Body, Universe, Trajectory, SurfaceOrbit
+from .util import randomFloat, randomPointRect, log
 
 
 class PlanetType:

@@ -1,6 +1,4 @@
 import tempfile
-import tkinter as tk
-
 from matplotlib.figure import Figure as mplFigure
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 import PIL

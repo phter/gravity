@@ -6,11 +6,11 @@ except: pass
 import tkinter as tk
 import numpy as np
 
-from tkutil import Container, CanvasObject
-from visual import createHeatmap, createVectorPlot
-from geometry import Point, Circle
-from config import Config
-from util import log
+from .tkutil import Container, CanvasObject
+from .visual import createHeatmap, createVectorPlot
+from .geometry import Point, Circle
+from .config import Config
+from .util import log
 
 
 FGTAG = 'fg'    # tag for all objects above background images

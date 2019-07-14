@@ -1,6 +1,7 @@
 import random
 import numpy as np
-from geometry import Point
+
+from .geometry import Point
 
 
 def log(who, what):
