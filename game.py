@@ -304,8 +304,9 @@ class PlanetGenerator:
             if self.addPlanets(self.pTypes['black']):
                 return
         raise Exception("Failed to create planets")
-        self.aPlanets = np.zeros((len(self.planets), 6), dtype=np.double)
-        for i, p in enumerate(self.aPlanets):
+
+        self.aBodies = np.zeros((len(self.planets), 6), dtype=np.double)
+        for i, p in enumerate(self.planets):
             self.aBodies[i] = (p.pos.x, p.pos.y, p.radius, p.rotation, p.density, -1., 0)
 
     def createStartAndTarget(self):
