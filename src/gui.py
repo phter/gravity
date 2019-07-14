@@ -73,25 +73,25 @@ class Sliders(Container):
                  'resolution': 0.1
                  },
                  {'variable': var['nSmallPlanets'],
-                  'text': 'Number of small planets',
+                  'text': 'Num. small planets',
                   'from_': s.nSmallPlanetsRange.start,
                   'to': s.nSmallPlanetsRange.end,
                   'resolution': 1
                  },
                  {'variable': var['nNormalPlanets'],
-                  'text': 'Number of normal planets',
+                  'text': 'Num. normal planets',
                   'from_': s.nNormalPlanetsRange.start,
                   'to': s.nNormalPlanetsRange.end,
                   'resolution': 1
                  },
                  {'variable': var['nLargePlanets'],
-                  'text': 'Number of large planets',
+                  'text': 'Num. large planets',
                   'from_': s.nLargePlanetsRange.start,
                   'to': s.nLargePlanetsRange.end,
                   'resolution': 1
                  },
                  {'variable': var['nBlackPlanets'],
-                  'text': 'Number of black holes',
+                  'text': 'Num. black holes',
                   'from_': s.nBlackPlanetsRange.start,
                   'to': s.nBlackPlanetsRange.end,
                   'resolution': 1
@@ -308,20 +308,20 @@ class BottomFrame(Container):
     def layout(self):
         self.showGravLabel.grid(row=0, column=0, rowspan=2, sticky=tk.E)
         self.showGravButton.grid(row=0, column=1, rowspan=2)
-        self.hideGravButton.grid(row=0, column=2, rowspan=2)
+        self.hideGravButton.grid(row=0, column=2, rowspan=2, padx=5)
 
         self.showVectorsLabel.grid(row=2, column=0, rowspan=2, sticky=tk.E)
         self.showVectorsButton.grid(row=2, column=1, rowspan=2)
-        self.hideVectorsButton.grid(row=2, column=2, rowspan=2)
+        self.hideVectorsButton.grid(row=2, column=2, rowspan=2, padx=5)
 
         self.usedFuelText.grid(row=0, column=3)
-        self.usedFuelLabel.grid(row=0, column=4)
+        self.usedFuelLabel.grid(row=0, column=4, padx=5)
         self.launchesText.grid(row=1, column=3)
-        self.launchesLabel.grid(row=1, column=4)
+        self.launchesLabel.grid(row=1, column=4, padx=5)
         self.flightLengthText.grid(row=2, column=3)
-        self.flightLengthLabel.grid(row=2, column=4)
+        self.flightLengthLabel.grid(row=2, column=4, padx=5)
         self.lostText.grid(row=3, column=3)
-        self.lostLabel.grid(row=3, column=4)
+        self.lostLabel.grid(row=3, column=4, padx=5)
 
         self.animationSliderLabel.grid(row=0, column=5, rowspan=2, sticky=tk.E)
         self.animationSlider.grid(row=0, column=6, rowspan=2, sticky=tk.W)

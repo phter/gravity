@@ -53,7 +53,7 @@ class Config:
     gravityConstant = phylib.GConst
 
     # How many in-game seconds pass per second
-    timeFactor = 500
+    timeFactor = 200
 
     # sets thrust range to [ev*1.3^-5, ev*1.3^5]
     # ev being the escape velocity of a planet
