@@ -3,7 +3,9 @@
 from concurrent.futures import ThreadPoolExecutor
 import time
 import tkinter as tk
+from tkinter import filedialog
 import numpy as np
+import json
 
 from util import log
 from config import Config
@@ -123,11 +125,19 @@ class AppButtons(Container):
         self.quitButton = tk.Button(self.frame, text='Quit', command=self.app.quit)
         self.playButton = tk.Button(self.frame, text='New Game', command=self.app.startGame)
         self.restartButton = tk.Button(self.frame, text='Restart', command=self.app.restartGame)
+        self.saveButton = tk.Button(self.frame, text='Save', command=self.app.saveGame)
+        self.loadButton = tk.Button(self.frame, text='Load', command=self.app.loadGame)
+        self.resetButton = tk.Button(self.frame, text='Reset', command=self.app.resetSettings)
 
     def layout(self):
-        self.restartButton.grid(row=0, column=0, pady=30)
-        self.playButton.grid(row=0, column=1, padx=10, pady=30)
-        self.quitButton.grid(row=0, column=2, pady=30, padx=20)
+        self.restartButton.grid(row=0, column=0, pady=30, sticky=tk.W+tk.E)
+        self.playButton.grid(row=0, column=1, padx=5, sticky=tk.W+tk.E)
+        self.resetButton.grid(row=0, column=2, padx=5, sticky=tk.W+tk.E)
+
+        self.saveButton.grid(row=1, column=0, padx=5, sticky=tk.W+tk.E)
+        self.loadButton.grid(row=1, column=1, padx=5, sticky=tk.W+tk.E)
+        self.quitButton.grid(row=1, column=2, padx=10, sticky=tk.W+tk.E)
+
 
 
 class Clock(Container):
@@ -556,6 +566,36 @@ class App(Container):
         self.resetTextVariables()
         self.animating = True
         self.game = game
+
+    def loadGame(self):
+        path = filedialog.askopenfilename()
+        if len(path) == 0:
+            return
+
+        d = None
+        try:
+            with open(path) as f:
+                d = json.load(f)
+        except: pass
+
+        if d is not None:
+            for k, v in d.items():
+                self.settingVariables[k].set(v)
+
+    def saveGame(self):
+        path = filedialog.asksaveasfilename()
+        if len(path) == 0:
+            return
+
+        d = {k: v.get() for k, v in self.settingVariables.items()}
+        try:
+            with open(path, 'w') as f:
+                json.dump(d, f)
+        except: pass
+
+    def resetSettings(self):
+        for k, var in self.settingVariables.items():
+            var.set(self.settings.get(k))
 
     def tick(self):
         t = self.realTime()

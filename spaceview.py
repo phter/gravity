@@ -1,6 +1,5 @@
 """spaceview.py - a widget that displays our universe"""
 
-import tempfile
 try:
     from traceback import TracebackException
 except: pass
@@ -24,6 +23,7 @@ class SpaceView(Container):
     """
 
     def __init__(self, parent):
+
         Container.__init__(self, parent)
 
         self.universe = None
@@ -32,7 +32,7 @@ class SpaceView(Container):
         self.u2c = Config.canvasWidth / uniRect.width()
         self.c2u = 1/self.u2c
         self.cWidth = Config.canvasWidth
-        self.cHeight = uniRect.height()*self.u2c
+        self.cHeight = Config.canvasHeight
         self.cColor = Config.colors['canvasBackground'].tkString()
         self.canvas = tk.Canvas(self.frame,
                                 width=self.cWidth,
@@ -197,63 +197,6 @@ class SpaceView(Container):
             bv.update(self.canvas, polePoints[i])
 
         self.shipView.update(self.canvas, gt)
-
-
-class BView(CanvasObject):
-    def __init__(self, arr, *tags, **desc):
-        CanvasObject.__init__(self, arr, *tags, **desc)
-        self.arr = arr
-        self.pp = arr[3:5]
-        self.desc = desc
-
-    @property
-    def radius(self): return self.arr[2]
-
-    def create(self, **desc):
-        x, y = self.pos
-        r = self.radius
-        id = self.canvas.create_oval(x - r,
-                                     y - r,
-                                     x + r,
-                                     y + r,
-                                     fill=desc['bodyCol'],
-                                     width=desc['outlineWidth'],
-                                     outline=desc['outlineCol'],
-                                     tags=desc['tags'])
-        rotID = self.canvas.create_line(x,
-                                   y,
-                                   x,
-                                   y - r,
-                                   width=desc['rotorWidth'],
-                                   fill=desc['rotorCol'],
-                                   tags=desc['tags'])
-        return (id, rotID)
-
-
-class SView(CanvasObject):
-    """View responsible for drawing the ship
-
-        @ship          the ship to display
-        @size          size of square around ship display
-        @uni2canvas    a function to translate universe coords to canvas coords
-        @scale         scale factor  (canvas width / universe width)
-    """
-
-    def __init__(self, arr, size, *tags, **desc):
-        CanvasObject.__init__(self, arr, *tags, **desc)
-        self.size = size
-        self.offset = size/2
-        self.buf = np.array([0, 0], dtype=np.int)
-
-    def create(self, **desc):
-        ul = self.pos - self.offset
-        lr = self.pos + self.offset
-        id = self.canvas.create_oval(ul[0], ul[1], lr[0], lr[1],
-                                     fill=desc['shipCol'],
-                                     outline=desc['shipOutCol'],
-                                     tags=desc['tags'])
-        return id
-
 
 
 class BodyView(CanvasObject):
