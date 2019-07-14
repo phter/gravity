@@ -20,6 +20,7 @@ kann man die Herausforderungen selbst bestimmen:
 
 Steuerung
 =========
+
 Die Rakete startet immer senkrecht. Da alle Planeten rotieren, muss man also
 den richtigen Zeitpunkt abwarten, um in eine gewünschte Richtung zu fliegen.
 
@@ -29,6 +30,12 @@ jeweiligen Planeten, also der Geschwindigkeit, die benötigt würde, um den
 das Gravitationsfeld des Planeten in einem sonst leeren Universum zu ver-
 lassen.
 
+
+Laden / Speichern
+=================
+
+Hier kann man die Einstellungen auf der rechten Seite in eine Datei
+speichern, bzw. von einer Datei laden.
 
 
 Benutzeroberfläche
