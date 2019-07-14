@@ -1,0 +1,75 @@
+Spielstart
+==========
+
+$ python gravity.py
+
+
+Spielziel
+=========
+
+Die Rakete befindet sich zu beginn immer am außersten linken Planeten.
+Es gilt den grünen Planeten auf der rechten Seite zu erreichen.
+
+Da es sich mehr um eine Simulation als ein konventionelles Spiel handelt,
+kann man die Herausforderungen selbst bestimmen:
+- möglichst wenige Zwischenstopps
+- möglichst wenig Treibstoff verbrauchen
+- möglichst wenig Zeit, etc...
+
+
+
+Steuerung
+=========
+Die Rakete startet immer senkrecht. Da alle Planeten rotieren, muss man also
+den richtigen Zeitpunkt abwarten, um in eine gewünschte Richtung zu fliegen.
+
+Die Startgeschwindigkeit wird über den "Thrust"-Regler bestimmt. Dabei
+entspricht die mittlere Position stets der Fluchtgeschwindigkeit des
+jeweiligen Planeten, also der Geschwindigkeit, die benötigt würde, um den
+das Gravitationsfeld des Planeten in einem sonst leeren Universum zu ver-
+lassen.
+
+
+
+Benutzeroberfläche
+==================
+
+Die Regler, die keine Anzahl bestimmen, sind alle derart implementiert, dass
+       0   dem Standardwert entspricht
+   +/- x   eine (exponentiellen) Vergrößerung/Verkleinerung bewirkt
+
+
+Planet size           mittlere Planetengröße
+                      Es gibt immer drei verschiedene Größen: klein, mittel, groß
+Planet density        Dichte der Planeten
+                      Alle Planeten besitzen die gleiche Dichte
+Rotation speed        mittlere Rotationsgeschwindigkeit
+                      Die individuelle Rotationsgeschwindigkeit der Planeten
+                      variiert innerhalb eines Intervalls um die mittlere
+                      Geschwindigkeit
+Gravity               physikalische Gravitationskonstante
+Planet distance       Minimaler Abstand zwischen Planeten
+Num. small planets    Anz. kleiner Planeten
+Num. normal planets   Anz. mittelgroßer Planeten
+Num. large planets    Anz. großer Planeten
+Num. black holes      Anz. schwarzer Löcher
+Black hole mass       Masse eines schwarzen Lochs
+
+
+Load                  Einstellungen laden
+Save                  Einstellungen speichern
+Restart               Bestehendes Spiel neu starten
+New Game              Neues Spiel erstellen
+Reset                 Einstellung auf Standardwerte zurücksetzen
+Quit                  Programm beenden
+
+Thrust                Schub der Rakete
+Animation speed       Animationsgeschwindigkeit
+
+Show gravity          Zeigt eine Visualisierung der Gravitationsstärke an
+Show vectors          Zeigt eine Visualisierung der Gravitationsvektoren an
+
+Used fuel             Treibstoffverbrauch insgesamt
+Launches              Anzahl der Starts von einem Planeten
+Flight length         Zurückgelegte Flugstrecke
+Lost ships            Anzahl verlorengegangener Raketen

@@ -21,10 +21,12 @@ Nützliche Mathematik
   Wir benutzen das zur Abschätzung von dt bei der Berechnung der Flugbahn.
 
 
-Fehler / Verbesserungsmöglichkeiten
+Bugs / Verbesserungsmöglichkeiten
 ===================================
 
 Viele :)
 
-- Eine globale Konfigurationsdatei ist praktisch. Trotzdem sollten Objekte
-  NICHT direkt darauf zugreifen, sondern immer nur auf übergebene Parameter.
+- Durch die vielen Einstellungsmöglichkeiten gibt es Kombinationen, die vom
+  Programm nicht korrekt behandelt werden (können)
+  Zum Beispiel können nicht sehr viele Planeten maximaler Größe mit
+  maximalem Mindestabstand erzeugt werden.
